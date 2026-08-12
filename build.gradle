@@ -14,24 +14,58 @@ java {
     }
 }
 
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
 repositories {
     mavenCentral()
 }
 
 dependencies {
+    // Web / JPA / Validation
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Security + JWT
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    // jjwt 는 Jackson 2 API(com.fasterxml.jackson.databind)를 사용한다.
+    // Boot 4 는 Jackson 3(tools.jackson)가 기본이므로 Jackson 2 databind 를 명시적으로 추가한다.
+    // 빠뜨리면 토큰 직렬화 시점에 NoClassDefFoundError 가 발생한다.
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+    runtimeOnly 'com.fasterxml.jackson.core:jackson-databind'
+
+    // API 문서 (Swagger UI)
+    // springdoc-openapi 3.x 가 Spring Boot 4 를 지원한다
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+
+    // DB
     runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // Lombok / Devtools
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    // Boot 3.2+ 는 파라미터 이름 기반 바인딩에 이 옵션이 필요하다
+    options.compilerArgs << '-parameters'
+    options.encoding = 'UTF-8'
 }
 
 tasks.named('test') {

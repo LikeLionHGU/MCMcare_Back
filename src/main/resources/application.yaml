@@ -1,3 +1,67 @@
 spring:
   application:
     name: mcmcare
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:mcmcare}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:age0504!}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update            # 엔티티 기준 자동 생성. 인덱스·제약은 @Table 에 명시
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    open-in-view: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB         # 기본 1MB → 사진 업로드 시 반드시 상향
+      max-request-size: 40MB
+
+  jackson:
+    default-property-inclusion: non_null
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:mcmcare-local-dev-secret-key-must-be-at-least-32-bytes-long}
+    expire-minutes: 120
+
+  admin-key: ${ADMIN_KEY:mcmcare-admin-local}
+
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+  number:
+    as-format: "AS-%d-%05d"       # AS-2026-00341
+    pickup-format: "PKP-%d-%06d"  # PKP-2026-000847
+
+  file:
+    upload-dir: ${UPLOAD_DIR:./uploads}
+    base-url: ${FILE_BASE_URL:http://localhost:8080/files}
+
+  demo:
+    auto-handover: true           # 기사 앱 배포 시 false
+    # @Value 는 YAML 리스트(- item)를 읽지 못한다. 콤마 구분 문자열이어야
+    # ConversionService 가 List<String> 으로 변환한다.
+    handover-photo-urls: ${FILE_BASE_URL:http://localhost:8080/files}/demo/handover-1.jpg,${FILE_BASE_URL:http://localhost:8080/files}/demo/handover-2.jpg,${FILE_BASE_URL:http://localhost:8080/files}/demo/handover-3.jpg
+    customer-sign-url: ${FILE_BASE_URL:http://localhost:8080/files}/demo/sign-customer.png
+    driver-sign-url: ${FILE_BASE_URL:http://localhost:8080/files}/demo/sign-driver.png
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha       # 메서드 알파벳 정렬
+    tags-sorter: alpha
+    display-request-duration: true
+  api-docs:
+    path: /v3/api-docs
+  default-produces-media-type: application/json
+
+logging:
+  level:
+    com.ladder.mcmcare: DEBUG
+    org.hibernate.SQL: DEBUG
