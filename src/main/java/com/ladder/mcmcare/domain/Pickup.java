@@ -102,6 +102,11 @@ public class Pickup extends BaseCreatedEntity {
         this.status = PickupStatus.BOOKED;
     }
 
+    /** 예약번호 UNIQUE 충돌 시 재발급 (영속화 이전에만 호출) */
+    public void reassignPickupNo(String pickupNo) {
+        this.pickupNo = pickupNo;
+    }
+
     public void cancel() {
         this.status = PickupStatus.CANCELLED;
     }

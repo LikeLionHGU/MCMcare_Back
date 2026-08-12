@@ -69,7 +69,14 @@ public class AsCaseFacade {
      * 테이블이 추가되면 저장된 값을 읽도록 바꾸면 된다.
      */
     public AsCaseDto.EstimateResDto estimate(Long memberId, String asNo) {
+
         AsCase asCase = asCaseService.getOwned(memberId, asNo);
+
+        // 비싼 AI 호출 전에 상태를 먼저 검증한다
+        if (asCase.getStatus() == AsStatus.CANCELLED) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS);
+        }
+
         EstimateResult result = estimatePort.analyze(asCase, asCaseService.photosOf(asCase.getId()));
         return asCaseService.estimate(memberId, asNo, result);
     }

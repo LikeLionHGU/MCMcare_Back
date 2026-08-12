@@ -137,6 +137,11 @@ public class AsCase extends BaseTimeEntity {
         this.intakeType = "픽업 수거 접수";
     }
 
+    /** 접수번호 UNIQUE 충돌 시 재발급 (영속화 이전에만 호출) */
+    public void reassignAsNo(String asNo) {
+        this.asNo = asNo;
+    }
+
     /**
      * 상태 전이. AsStatusService 를 통해서만 호출한다.
      * 직접 호출하면 as_status_history 와 어긋나 목록 뱃지와 상세 타임라인이 달라진다.

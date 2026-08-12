@@ -1,6 +1,5 @@
 package com.ladder.mcmcare.service;
 
-import com.ladder.mcmcare.domain.Pickup;
 import com.ladder.mcmcare.domain.PickupStatus;
 import com.ladder.mcmcare.repository.PickupRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +14,11 @@ import java.util.List;
 /**
  * 자동 인계 스케줄러 — 기사 앱 미배포 구간 대체.
  *
- * 기사 화면이 배포되기 전까지 서버가 인계를 대신 수행한다.
- * HandoverService.complete() 를 그대로 호출하므로
- * 자동·수동 어느 경로든 결과가 동일하다.
+ * HandoverService.completeById() 를 호출하므로 자동·수동 어느 경로든 결과가 동일하다.
+ *
+ * ⚠️ 엔티티가 아닌 ID 목록을 조회한다.
+ * 스케줄러 메서드에는 트랜잭션이 없어, 엔티티를 그대로 들고 나가면 detached 가 되어
+ * LAZY 초기화(getDriver 등)가 실패하고 상태 변경도 DB 에 반영되지 않는다.
  *
  * 시간대는 보지 않고 날짜만 판정한다 — 당일 예약이 즉시 처리되도록 하기 위함이다.
  * app.demo.auto-handover 를 false 로 두면 동작하지 않는다.
@@ -47,16 +48,15 @@ public class HandoverScheduler {
 
         if (!enabled) return;
 
-        List<Pickup> targets = pickupRepository
-                .findByStatusAndPickupDateLessThanEqual(PickupStatus.BOOKED, LocalDate.now());
+        List<Long> targetIds = pickupRepository
+                .findIdsForAutoHandover(PickupStatus.BOOKED, LocalDate.now());
 
-        for (Pickup pickup : targets) {
-            if (pickup.getDriver() == null) continue;
+        for (Long pickupId : targetIds) {
             try {
-                handoverService.complete(pickup, photoUrls, customerSignUrl, driverSignUrl);
-                log.info("자동 인계 완료 pickupNo={}", pickup.getPickupNo());
+                handoverService.completeById(pickupId, photoUrls, customerSignUrl, driverSignUrl);
+                log.info("자동 인계 완료 pickupId={}", pickupId);
             } catch (Exception e) {
-                log.warn("자동 인계 실패 pickupNo={}", pickup.getPickupNo(), e);
+                log.warn("자동 인계 실패 pickupId={} : {}", pickupId, e.getMessage());
             }
         }
     }

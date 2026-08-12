@@ -59,6 +59,9 @@ public class FileService {
     }
 
     public List<String> upload(List<MultipartFile> files, String subDir) {
+        if (files == null || files.isEmpty()) {
+            throw new BusinessException(ErrorCode.PHOTO_REQUIRED);
+        }
         return files.stream().map(f -> upload(f, subDir)).toList();
     }
 

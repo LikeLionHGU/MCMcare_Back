@@ -17,9 +17,21 @@ public class JwtProvider {
     private final SecretKey key;
     private final long expireMillis;
 
+    /** HS256 최소 키 길이 (RFC 7518) */
+    private static final int MIN_SECRET_BYTES = 32;
+
     public JwtProvider(@Value("${app.jwt.secret}") String secret,
                        @Value("${app.jwt.expire-minutes}") long expireMinutes) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < MIN_SECRET_BYTES) {
+            // 그냥 두면 jjwt 가 WeakKeyException 을 던지는데 원인이 드러나지 않는다
+            throw new IllegalStateException(
+                    "app.jwt.secret 이 너무 짧습니다 (%d bytes). HS256 은 최소 %d bytes 가 필요합니다."
+                            .formatted(bytes.length, MIN_SECRET_BYTES));
+        }
+
+        this.key = Keys.hmacShaKeyFor(bytes);
         this.expireMillis = expireMinutes * 60 * 1000;
     }
 

@@ -1,0 +1,33 @@
+# 배포 전용 설정
+#   실행:  java -jar app.jar --spring.profiles.active=prod
+#
+# 이 프로필에서는 SecretsCheck 가 개발용 기본 비밀값을 감지하면 기동을 중단시킨다.
+# JWT_SECRET · ADMIN_KEY · DB_PASSWORD 를 반드시 환경변수로 주입할 것.
+
+spring:
+  jpa:
+    hibernate:
+      # 운영에서는 스키마를 자동 변경하지 않는다.
+      # 엔티티와 실제 테이블이 어긋나면 기동 시점에 바로 드러난다.
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+app:
+  demo:
+    # 기사 앱 배포 후에는 자동 인계를 끈다
+    auto-handover: false
+
+springdoc:
+  api-docs:
+    # 배포 URL 이 공개 상태이므로 API 문서를 노출하지 않는다
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.ladder.mcmcare: INFO
+    org.hibernate.SQL: WARN

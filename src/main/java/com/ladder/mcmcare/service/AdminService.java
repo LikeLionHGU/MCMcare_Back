@@ -30,6 +30,10 @@ public class AdminService {
         if (asCase.getStatus() == AsStatus.CANCELLED) {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
         }
+        // 진행 순서를 건너뛰거나 되돌리는 전이를 막는다
+        if (!asCase.getStatus().canProgressTo(req.getStatus())) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS);
+        }
 
         asCase.updateSchedule(req.getExpectedCompletedAt(), req.getDelayReason());
         asCase.updateLocation(req.getCurrentLocation(), req.getLocationType(), req.getLocationStatus());

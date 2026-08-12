@@ -17,6 +17,7 @@ import com.ladder.mcmcare.repository.PickupRepository;
 import com.ladder.mcmcare.repository.PickupSlotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,9 @@ public class PickupService {
 
     /** 취소 가능 마감 — 픽업 예정일 기준 */
     private static final int CANCEL_DEADLINE_HOURS = 24;
+
+    /** 예약번호 UNIQUE 충돌 시 재시도 횟수 */
+    private static final int MAX_NO_RETRY = 3;
 
     private final PickupRepository pickupRepository;
     private final PickupSlotRepository slotRepository;
@@ -159,7 +163,17 @@ public class PickupService {
                 .insuranceLimit(5_000_000)
                 .build();
 
-        pickupRepository.save(pickup);
+        // 예약번호 UNIQUE 충돌 시 재발급 (채번은 미커밋 동시 요청을 볼 수 없다)
+        for (int attempt = 0; ; attempt++) {
+            try {
+                pickupRepository.saveAndFlush(pickup);
+                break;
+            } catch (DataIntegrityViolationException e) {
+                if (attempt >= MAX_NO_RETRY) throw e;
+                pickup.reassignPickupNo(numberGenerator.generatePickupNo());
+            }
+        }
+
         asStatusService.transit(asCase, AsStatus.PICKUP_BOOKED, "픽업 예약 완료");
 
         return PickupDto.CreateResDto.from(pickup);

@@ -19,12 +19,23 @@ public class ProductService {
     /**
      * 보증서가 없으면 404. 프론트는 자동 채움만 생략하고 접수는 계속 진행한다.
      *
-     * 소유자 검증은 하지 않는다 — 보증서 번호만 알면 타인 구매정보가 노출되는 구조이나,
-     * 기획에서 소유자 정책이 확정되지 않았다. product.member_id 컬럼은 준비돼 있다.
+     * 소유자가 지정된 보증서는 본인만 조회할 수 있다.
+     * 지정되지 않은 보증서(member_id 가 null)는 아직 등록 전이므로 조회를 허용한다 —
+     * 최초 접수 시 자동 채움이 동작해야 하기 때문이다.
+     *
+     * ⚠️ 소유자 등록 시점 정책은 기획 확정 대기 중이다.
      */
-    public ProductDto.DetailResDto detail(String warrantyNo) {
+    public ProductDto.DetailResDto detail(Long memberId, String warrantyNo) {
+
         Product product = productRepository.findById(warrantyNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
+
+        if (product.getMember() != null
+                && !product.getMember().getId().equals(memberId)) {
+            // 존재 여부 자체를 숨긴다 — 403 이면 번호가 유효하다는 사실이 드러난다
+            throw new BusinessException(ErrorCode.NO_MATCHING_DATA);
+        }
+
         return ProductDto.DetailResDto.from(product);
     }
 }

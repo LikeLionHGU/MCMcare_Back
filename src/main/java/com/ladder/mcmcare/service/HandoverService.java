@@ -11,6 +11,7 @@ import com.ladder.mcmcare.exception.BusinessException;
 import com.ladder.mcmcare.exception.ErrorCode;
 import com.ladder.mcmcare.repository.HandoverPhotoRepository;
 import com.ladder.mcmcare.repository.HandoverRepository;
+import com.ladder.mcmcare.repository.PickupRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class HandoverService {
 
     private final HandoverRepository handoverRepository;
     private final HandoverPhotoRepository handoverPhotoRepository;
+    private final PickupRepository pickupRepository;
     private final AsStatusService asStatusService;
 
     /**
@@ -43,6 +45,21 @@ public class HandoverService {
      * handedOverAt 은 서버가 기록한다. 기기 시계 오차·조작을 배제하기 위함이며
      * 이 값은 분쟁 시 참고 자료가 된다.
      */
+    /**
+     * 스케줄러 전용 진입점.
+     * 트랜잭션 안에서 pickup 을 다시 조회해 managed 상태로 만든 뒤 처리한다.
+     * detached 엔티티를 넘기면 LAZY 초기화가 실패하고 상태 변경이 flush 되지 않는다.
+     */
+    @Transactional
+    public LocalDateTime completeById(Long pickupId,
+                                      List<String> photoUrls,
+                                      String customerSignUrl,
+                                      String driverSignUrl) {
+        Pickup pickup = pickupRepository.findById(pickupId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
+        return complete(pickup, photoUrls, customerSignUrl, driverSignUrl);
+    }
+
     @Transactional
     public LocalDateTime complete(Pickup pickup,
                                   List<String> photoUrls,
@@ -50,6 +67,13 @@ public class HandoverService {
                                   String driverSignUrl) {
 
         if (pickup.getStatus() != PickupStatus.BOOKED) {
+            throw new BusinessException(ErrorCode.ALREADY_HANDED_OVER);
+        }
+        if (pickup.getDriver() == null) {
+            throw new BusinessException(ErrorCode.NO_AVAILABLE_DRIVER);
+        }
+        // 수동·자동 경로가 동시에 들어와도 UNIQUE 제약 이전에 걸러낸다
+        if (handoverRepository.existsByPickupId(pickup.getId())) {
             throw new BusinessException(ErrorCode.ALREADY_HANDED_OVER);
         }
         if (photoUrls == null || photoUrls.isEmpty()) {

@@ -35,6 +35,27 @@ public enum AsStatus {
     private final boolean terminal;
     private final String pendingDescription;
 
+    /**
+     * 관리자 API 가 진행시킬 수 있는 순서.
+     * 임의 상태로 건너뛰거나 되돌리는 것을 막는다.
+     */
+    private static final List<AsStatus> PROGRESSION = List.of(
+            PICKED_UP, RECEIVED, DIAGNOSED, REPAIRING, INSPECTING, SHIPPING, COMPLETED);
+
+    /**
+     * 관리자 전이 허용 여부.
+     * 진행 순서상 뒤에 있는 단계로만 이동할 수 있다.
+     * 되돌리기가 필요하면 별도 정책을 정한 뒤 열어야 한다.
+     */
+    public boolean canProgressTo(AsStatus next) {
+        int from = PROGRESSION.indexOf(this);
+        int to = PROGRESSION.indexOf(next);
+        if (to < 0) return false;                 // 관리자가 옮길 수 없는 상태
+        if (this == PICKUP_BOOKED) return next == PICKED_UP;   // 기사 인계 구간
+        if (from < 0) return false;               // 아직 수거 전
+        return to > from;
+    }
+
     /** 상세 화면 타임라인에 노출되는 단계 (수거 이후 수선 센터 구간) */
     public static final List<AsStatus> TIMELINE = List.of(
             PICKED_UP, RECEIVED, DIAGNOSED, REPAIRING, INSPECTING, SHIPPING, COMPLETED);

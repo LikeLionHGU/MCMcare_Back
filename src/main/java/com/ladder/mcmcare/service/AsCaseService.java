@@ -23,6 +23,7 @@ import com.ladder.mcmcare.repository.PickupRepository;
 import com.ladder.mcmcare.repository.ProductRepository;
 import com.ladder.mcmcare.service.port.EstimateResult;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,9 @@ import java.util.List;
 public class AsCaseService {
 
     private static final int MAX_PHOTOS = 3;
+
+    /** 접수번호 UNIQUE 충돌 시 재시도 횟수 */
+    private static final int MAX_NO_RETRY = 3;
 
     private final AsCaseRepository asCaseRepository;
     private final AsPhotoRepository asPhotoRepository;
@@ -100,7 +104,17 @@ public class AsCaseService {
                 .damageDescription(req.getDamageDescription())
                 .build();
 
-        asCaseRepository.save(asCase);
+        // 동시 요청이 같은 번호를 만들 수 있다. existsByAsNo 로는 미커밋 트랜잭션을 볼 수 없으므로
+        // UNIQUE 위반을 잡아 번호를 다시 받는다.
+        for (int attempt = 0; ; attempt++) {
+            try {
+                asCaseRepository.saveAndFlush(asCase);
+                break;
+            } catch (DataIntegrityViolationException e) {
+                if (attempt >= MAX_NO_RETRY) throw e;
+                asCase.reassignAsNo(numberGenerator.generateAsNo());
+            }
+        }
 
         for (int i = 0; i < photoUrls.size(); i++) {
             asPhotoRepository.save(AsPhoto.of(asCase, photoUrls.get(i), types.get(i), i));
