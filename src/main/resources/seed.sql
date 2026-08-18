@@ -28,12 +28,12 @@ VALUES
 -- ---------------------------------------------------------------------
 INSERT IGNORE INTO member
     (email, password, name, phone, birth_date,
-     agreed_service, agreed_privacy, agreed_at, created_at, updated_at)
+     agreed_service, agreed_privacy, agreed_at, provider, created_at, updated_at)
 VALUES
     ('user@example.com',
      '$2a$10$ZhZ0t0tva3wQ8XGaffS0IukrVQLYWBNaW26HQoZQxUlJz3ouwDOu6',   -- Password123!
      '이서연', '01012345678', '1998-03-15',
-     TRUE, TRUE, NOW(), NOW(), NOW());
+     TRUE, TRUE, NOW(), 'LOCAL', NOW(), NOW());
 
 INSERT INTO marketing_consent (member_id, agreed, occurred_at)
 SELECT m.member_id, FALSE, NOW()
@@ -52,22 +52,22 @@ WHERE m.email = 'user@example.com'
 --    보증서 없이 접수하면 UNKNOWN 이 된다.
 -- ---------------------------------------------------------------------
 INSERT IGNORE INTO product
-    (warranty_no, member_id, product_type, model_name,
+    (warranty_no, product_type, model_name,
      purchased_at, purchase_channel, warranty_months, warranty_expires_at, warranty_scope)
 VALUES
-    ('MCM-W-2025-1001', NULL, 'BAG',       'MCM 클래식 백팩 미디엄',
+    ('MCM-W-2025-1001', 'BAG',    'MCM 클래식 백팩 미디엄',
      '2025-10-01', 'OFFICIAL_STORE',   24, '2027-10-01', '제조 결함 한정'),
 
-    ('MCM-W-2022-0301', NULL, 'BAG',       'MCM 스타크 백팩 미디엄',
+    ('MCM-W-2022-0301', 'BAG',    'MCM 스타크 백팩 미디엄',
      '2022-03-05', 'DEPARTMENT_STORE', 24, '2024-03-05', '제조 결함 한정'),
 
-    ('MCM-W-2026-0110', NULL, 'WALLET',    'MCM 클래식 지갑',
+    ('MCM-W-2026-0110', 'WALLET', 'MCM 클래식 지갑',
      '2026-01-10', 'ONLINE_STORE',     24, '2028-01-10', '제조 결함 한정'),
 
-    ('MCM-W-2024-0722', NULL, 'BAG',       'MCM 미니 크로스백',
+    ('MCM-W-2024-0722', 'BAG',    'MCM 미니 크로스백',
      '2024-07-22', 'DUTY_FREE',        24, '2026-07-22', '제조 결함 한정'),
 
-    ('MCM-W-2023-0415', NULL, 'BAG',       'MCM 비세토스 토트백',
+    ('MCM-W-2023-0415', 'BAG',    'MCM 비세토스 토트백',
      '2023-04-15', 'OFFICIAL_STORE',   24, '2025-04-15', '제조 결함 한정');
 
 

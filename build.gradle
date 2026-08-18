@@ -40,6 +40,10 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     runtimeOnly 'com.fasterxml.jackson.core:jackson-databind'
 
+    // 구글 ID 토큰 검증
+    // 구글 공개키(JWKS)를 내려받아 서명을 확인한다. 클라이언트 시크릿은 필요 없다.
+    implementation 'com.google.api-client:google-api-client:2.7.0'
+
     // API 문서 (Swagger UI)
     // springdoc-openapi 3.x 가 Spring Boot 4 를 지원한다
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
