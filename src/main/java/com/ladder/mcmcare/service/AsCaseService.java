@@ -1,6 +1,8 @@
 package com.ladder.mcmcare.service;
 
 import com.ladder.mcmcare.domain.AsCase;
+import com.ladder.mcmcare.domain.Estimate;
+import com.ladder.mcmcare.domain.EstimateItem;
 import com.ladder.mcmcare.domain.AsPhoto;
 import com.ladder.mcmcare.domain.AsStatus;
 import com.ladder.mcmcare.domain.AsStatusHistory;
@@ -16,6 +18,8 @@ import com.ladder.mcmcare.dto.AsCaseDto;
 import com.ladder.mcmcare.exception.BusinessException;
 import com.ladder.mcmcare.exception.ErrorCode;
 import com.ladder.mcmcare.repository.AsCaseRepository;
+import com.ladder.mcmcare.repository.EstimateItemRepository;
+import com.ladder.mcmcare.repository.EstimateRepository;
 import com.ladder.mcmcare.repository.AsPhotoRepository;
 import com.ladder.mcmcare.repository.AsStatusHistoryRepository;
 import com.ladder.mcmcare.repository.MemberRepository;
@@ -51,6 +55,8 @@ public class AsCaseService {
     private final WarrantyEvaluator warrantyEvaluator;
     private final NumberGenerator numberGenerator;
     private final FileUrlSigner fileUrlSigner;
+    private final EstimateRepository estimateRepository;
+    private final EstimateItemRepository estimateItemRepository;
 
     // ── Form ─────────────────────────────────────────────────────
 
@@ -119,13 +125,54 @@ public class AsCaseService {
 
     // ── Create (3단계: 견적 반영) ────────────────────────────────
 
+    /**
+     * AI 분석 결과를 저장하고 상태를 전이한다.
+     *
+     * 저장하지 않으면 조회할 때마다 AI 를 다시 호출해야 한다.
+     * 같은 접수 건인데 열어볼 때마다 금액이 달라지고, 조회에 수십 초가 걸린다.
+     *
+     * 재분석이면 이전 견적을 지우고 새로 쓴다. 이력은 남기지 않는다.
+     */
     @Transactional
     public AsCaseDto.CreateResDto applyEstimate(Long asId, EstimateResult result) {
+
         AsCase asCase = getById(asId);
+        saveEstimate(asCase, result);
         asStatusService.transit(asCase, AsStatus.ESTIMATED, "AI 예상 견적 산출 완료");
-        // 견적 상세는 Phase 2 의 estimate 테이블에 저장된다.
-        // 현재는 조회 시점에 재계산하므로 별도 영속화가 없다.
         return AsCaseDto.CreateResDto.from(asCase);
+    }
+
+    private void saveEstimate(AsCase asCase, EstimateResult result) {
+
+        // 재분석 시 이전 건을 먼저 지운다. as_id 에 UNIQUE 가 걸려 있어 덮어쓸 수 없다.
+        //
+        // 항목을 명시적으로 지우는 이유 — 항목은 estimateItemRepository.save() 로 따로 저장하므로
+        // estimate.items 컬렉션이 비어 있을 수 있다. cascade 에만 맡기면 FK 위반이 날 수 있다.
+        // DB 의 fk_item_estimate 는 RESTRICT 라 순서를 지켜야 한다.
+        estimateRepository.findByAsCaseId(asCase.getId()).ifPresent(prev -> {
+            estimateItemRepository.deleteByEstimateId(prev.getId());
+            estimateItemRepository.flush();
+            estimateRepository.delete(prev);
+            estimateRepository.flush();
+        });
+
+        Estimate estimate = estimateRepository.save(Estimate.builder()
+                .asCase(asCase)
+                .damageCategory(result.getDamageCategory())
+                .damageSeverity(result.getDamageSeverity())
+                .confidenceGrade(result.getConfidenceGrade())
+                .confidenceNote(result.getConfidenceNote())
+                .noDamageNotice(result.getNoDamageNotice())
+                .rawResponse(result.getRawResponse())
+                .build());
+
+        List<EstimateResult.Item> items = result.getItems();
+        for (int i = 0; i < items.size(); i++) {
+            EstimateResult.Item item = items.get(i);
+            estimate.addItem(estimateItemRepository.save(EstimateItem.of(
+                    estimate, item.getRepairItemName(),
+                    item.getEstimatedPrice(), item.getMinPrice(), item.getMaxPrice(), i)));
+        }
     }
 
     /**
@@ -164,6 +211,36 @@ public class AsCaseService {
 
     // ── Estimate 조회 ────────────────────────────────────────────
 
+    /**
+     * 저장된 견적을 읽어 화면 계약으로 복원한다.
+     * 없으면 아직 분석이 끝나지 않은 것이다.
+     */
+    public EstimateResult storedEstimate(Long asId) {
+
+        Estimate e = estimateRepository.findByAsCaseId(asId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
+
+        List<EstimateResult.Item> items = estimateItemRepository
+                .findByEstimateIdOrderBySortOrder(e.getId())
+                .stream()
+                .map(i -> EstimateResult.Item.builder()
+                        .repairItemName(i.getRepairItemName())
+                        .estimatedPrice(i.getEstimatedPrice())
+                        .minPrice(i.getMinPrice())
+                        .maxPrice(i.getMaxPrice())
+                        .build())
+                .toList();
+
+        return EstimateResult.builder()
+                .damageCategory(e.getDamageCategory())
+                .damageSeverity(e.getDamageSeverity())
+                .confidenceGrade(e.getConfidenceGrade())
+                .confidenceNote(e.getConfidenceNote())
+                .noDamageNotice(e.getNoDamageNotice())
+                .items(items)
+                .build();
+    }
+
     public AsCaseDto.EstimateResDto estimate(Long memberId, String asNo, EstimateResult result) {
         AsCase asCase = getOwned(memberId, asNo);
 
@@ -195,7 +272,7 @@ public class AsCaseService {
                 memberId, List.of(AsStatus.COMPLETED));
 
         LocalDate lastUpdated = asCaseRepository.findLastUpdatedAt(memberId)
-                .map(java.time.LocalDateTime::toLocalDate).orElse(null);
+                .map(LocalDateTime::toLocalDate).orElse(null);
 
         Map<Long, String> thumbnails = thumbnailsOf(page.getContent());
 
@@ -252,12 +329,17 @@ public class AsCaseService {
                         c.getId(), List.of(PickupStatus.BOOKED, PickupStatus.COMPLETED))
                 .map(Pickup::getPickupNo).orElse(null);
 
+        List<String> photoUrls = fileUrlSigner.sign(
+                asPhotoRepository.findByAsCaseIdOrderBySortOrder(c.getId())
+                        .stream().map(AsPhoto::getFileUrl).toList());
+
         return AsCaseDto.DetailResDto.builder()
                 .asNo(c.getAsNo())
                 .modelName(c.getModelName())
                 .createdAt(c.getCreatedAt().toLocalDate())
                 .intakeType(c.getIntakeType())
                 .pickupNo(pickupNo)
+                .photoUrlList(photoUrls)
                 .status(c.getStatus().name())
                 .statusLabel(c.getStatus().getLabel())
                 .statusUpdatedAt(c.getStatusUpdatedAt())

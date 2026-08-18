@@ -256,6 +256,12 @@ public class AsCaseDto {
         private String intakeType;
         private String pickupNo;
 
+        /**
+         * 접수 시 올린 사진. 서명된 URL 이다.
+         * 목록은 첫 장(thumbnailUrl)만 쓰지만 상세는 전체를 보여줄 수 있어 리스트로 준다.
+         */
+        private List<String> photoUrlList;
+
         private String status;
         private String statusLabel;
         private LocalDateTime statusUpdatedAt;

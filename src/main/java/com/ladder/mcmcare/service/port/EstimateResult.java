@@ -38,6 +38,12 @@ public class EstimateResult {
      */
     private String noDamageNotice;
 
+    /**
+     * AI 서버 응답 원문. 화면에는 쓰지 않고 저장만 한다.
+     * 표시된 금액이 이상할 때 원인을 추적하는 용도다. 스텁은 null.
+     */
+    private String rawResponse;
+
     @Getter
     @Builder
     public static class Item {

@@ -120,14 +120,15 @@ public class AsCaseFacade {
 
     /**
      * 712 견적 조회.
-     * Phase 2 의 estimate 테이블이 없으므로 조회 시점에 재계산한다.
-     * 테이블이 추가되면 저장된 값을 읽도록 바꾸면 된다.
+     *
+     * 접수 시점에 저장해 둔 결과를 읽는다. AI 를 다시 부르지 않는다.
+     * 매번 재분석하면 같은 접수 건인데 열어볼 때마다 금액이 달라지고,
+     * 조회에 수십 초가 걸린다.
      */
     public AsCaseDto.EstimateResDto estimate(Long memberId, String asNo) {
 
         AsCase asCase = asCaseService.getOwned(memberId, asNo);
 
-        // 비싼 AI 호출 전에 상태를 먼저 검증한다.
         // 분석 미완료(DRAFT · ANALYZING) · 실패(ESTIMATE_FAILED) · 취소 건은 조회할 수 없다.
         // 특히 ESTIMATE_FAILED 는 재분석 API 로만 처리해야 한다 —
         // 조회로도 AI 가 돌면 재시도 경로가 둘이 되어 상태 관리가 어긋난다.
@@ -135,7 +136,7 @@ public class AsCaseFacade {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
         }
 
-        EstimateResult result = estimatePort.analyze(asCase, asCaseService.photosOf(asCase.getId()));
+        EstimateResult result = asCaseService.storedEstimate(asCase.getId());
         return asCaseService.estimate(memberId, asNo, result);
     }
 

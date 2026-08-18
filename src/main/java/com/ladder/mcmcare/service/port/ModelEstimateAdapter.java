@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +43,7 @@ public class ModelEstimateAdapter implements EstimatePort {
 
     private final RestClient restClient;
     private final EstimateMapper mapper;
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final Path uploadDir;
     private final String fileBaseUrl;
 
@@ -81,21 +83,27 @@ public class ModelEstimateAdapter implements EstimatePort {
             throw new IllegalStateException("AI 서버로 보낼 사진 파일이 없습니다.");
         }
 
-        AiDiagnoseResponse res = restClient.post()
+        // 원문을 함께 보관한다. 표시된 금액이 이상할 때 원인을 추적하는 용도다.
+        String raw = restClient.post()
                 .uri("/diagnose/multi")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(body)
                 .retrieve()
-                .body(AiDiagnoseResponse.class);
+                .body(String.class);
 
-        if (res == null) {
+        if (raw == null || raw.isBlank()) {
             throw new IllegalStateException("AI 서버 응답이 비어 있습니다.");
         }
 
-        return toEstimateResult(res, photos.size());
+        AiDiagnoseResponse res = jsonMapper.readValue(raw, AiDiagnoseResponse.class);
+        if (res == null) {
+            throw new IllegalStateException("AI 서버 응답을 해석할 수 없습니다.");
+        }
+
+        return toEstimateResult(res, photos.size(), raw);
     }
 
-    private EstimateResult toEstimateResult(AiDiagnoseResponse res, int photoCount) {
+    private EstimateResult toEstimateResult(AiDiagnoseResponse res, int photoCount, String raw) {
 
         List<AiDiagnoseResponse.Damage> damages =
                 res.getDamages() == null ? List.of() : res.getDamages();
@@ -109,6 +117,7 @@ public class ModelEstimateAdapter implements EstimatePort {
                     .confidenceNote(mapper.confidenceNote(photoCount))
                     .items(List.of())
                     .noDamageNotice(EstimateMapper.NO_DAMAGE_NOTICE)
+                    .rawResponse(raw)
                     .build();
         }
 
@@ -139,6 +148,7 @@ public class ModelEstimateAdapter implements EstimatePort {
                 .confidenceGrade(mapper.confidenceGrade(maxConfidence))
                 .confidenceNote(mapper.confidenceNote(photoCount))
                 .items(items)
+                .rawResponse(raw)
                 .build();
     }
 
