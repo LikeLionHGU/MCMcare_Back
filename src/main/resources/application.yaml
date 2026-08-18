@@ -94,6 +94,11 @@ app:
     customer-sign-url: ${FILE_BASE_URL:http://localhost:8080/files}/demo/sign-customer.png
     driver-sign-url: ${FILE_BASE_URL:http://localhost:8080/files}/demo/sign-driver.png
 
+  chatbot:
+    # AI 상담 챗봇(FastAPI) 주소. 비우면 ChatRestController 가 503 안내 문구를 돌려준다.
+    base-url: ${CHATBOT_BASE_URL:http://localhost:8001}
+    timeout-seconds: ${CHATBOT_TIMEOUT_SECONDS:60}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
