@@ -2,13 +2,18 @@ package com.ladder.mcmcare.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -69,6 +74,61 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(ErrorCode.NO_PERMISSION));
     }
 
+    /**
+     * 매핑되지 않은 경로.
+     *
+     * 그냥 두면 아래 전역 catch 에 걸려 500 이 나간다.
+     * 500 은 "서버가 고장났다"는 뜻이라 클라이언트가 재시도할지 판단할 수 없다.
+     * 404 면 "그런 주소는 없다"가 명확해 호출 코드를 고치면 된다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException e) {
+        log.warn("존재하지 않는 경로: {}", e.getResourcePath());
+        return response(ErrorCode.NO_MATCHING_DATA);
+    }
+
+    /**
+     * 본문을 읽지 못한 경우 — JSON 문법 오류, 정의되지 않은 enum 값, 잘못된 날짜 형식 등.
+     * 전부 사용자 입력 문제이므로 400 이 맞다.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException e) {
+        log.warn("요청 본문 해석 실패: {}", e.getMostSpecificCause().getMessage());
+        return response(ErrorCode.VALIDATION_FAILED);
+    }
+
+    /**
+     * 경로 변수 · 쿼리 파라미터의 타입이 맞지 않는 경우.
+     * 예) /api/pickup/slot?startDate=abc  →  LocalDate 로 변환 실패
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        log.warn("파라미터 타입 불일치: {} = {}", e.getName(), e.getValue());
+        return response(ErrorCode.VALIDATION_FAILED);
+    }
+
+    /** 필수 쿼리 파라미터 누락 */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException e) {
+        log.warn("필수 파라미터 누락: {}", e.getParameterName());
+        return response(ErrorCode.VALIDATION_FAILED);
+    }
+
+    /** 경로는 맞지만 HTTP 메서드가 다른 경우 (예: GET 으로 만든 API 를 POST 로 호출) */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
+        log.warn("지원하지 않는 메서드: {}", e.getMethod());
+        return response(ErrorCode.METHOD_NOT_ALLOWED);
+    }
+
+    private ResponseEntity<ErrorResponse> response(ErrorCode code) {
+        return ResponseEntity.status(code.getStatus()).body(ErrorResponse.of(code));
+    }
+
+    /**
+     * 위에서 걸러지지 않은 예외만 여기 온다.
+     * 여기 걸리는 것은 진짜 서버 결함이므로 로그를 남기고 조사해야 한다.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
         log.error("Unhandled exception", e);

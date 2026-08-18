@@ -30,6 +30,7 @@ public enum ErrorCode {
     NO_PERMISSION(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
 
     // 404
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식입니다."),
     NO_MATCHING_DATA(HttpStatus.NOT_FOUND, "요청한 정보를 찾을 수 없습니다."),
 
     // 409

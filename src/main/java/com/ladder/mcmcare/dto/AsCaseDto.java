@@ -200,7 +200,8 @@ public class AsCaseDto {
             return (filter == null || filter.isBlank()) ? "ALL" : filter;
         }
         public int pageOrDefault() {
-            return page == null ? 0 : page;
+            // 음수를 그대로 넘기면 PageRequest.of() 가 IllegalArgumentException 을 던져 500 이 된다.
+            return (page == null || page < 0) ? 0 : page;
         }
         public int sizeOrDefault() {
             return (size == null || size < 1) ? 20 : Math.min(size, 100);
@@ -261,6 +262,22 @@ public class AsCaseDto {
          * 목록은 첫 장(thumbnailUrl)만 쓰지만 상세는 전체를 보여줄 수 있어 리스트로 준다.
          */
         private List<String> photoUrlList;
+
+        /**
+         * 접수 시 사용자가 입력한 손상 정보.
+         * AI 가 판정한 damageCategory(견적 응답)와는 다르다 — 이쪽은 고객의 진술이다.
+         * AI 상담이 "어디가 어떻게 손상됐나요?" 에 답하려면 필요하다.
+         */
+        private String damagePart;
+        private String damageType;
+        private String damageTypeLabel;
+        private String damageDescription;
+
+        /**
+         * AI 가 판정한 손상 유형. 견적이 없으면 null.
+         * 고객이 고른 damageType 과 다를 수 있다 — AI 는 사진을 보고 판단한다.
+         */
+        private String damageCategory;
 
         private String status;
         private String statusLabel;

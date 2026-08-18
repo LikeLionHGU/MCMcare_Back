@@ -4,6 +4,7 @@ import com.ladder.mcmcare.security.LoginMember;
 import com.ladder.mcmcare.security.PrincipalDetails;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -65,13 +66,16 @@ public class ChatRestController {
     @PreAuthorize("hasRole('MEMBER')")
     @PostMapping
     public ResponseEntity<String> chat(@RequestBody ChatReqDto req,
-                                       @LoginMember PrincipalDetails principal) {
+                                       @LoginMember PrincipalDetails principal,
+                                       @RequestHeader(value = HttpHeaders.AUTHORIZATION,
+                                                      required = false) String auth) {
         if (!enabled) {
             return unavailable();
         }
         try {
             String body = restClient.post()
                     .uri("/chat")
+                    .headers(h -> forward(h, auth))
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(payload(req, principal))
                     .retrieve()
@@ -95,7 +99,9 @@ public class ChatRestController {
      */
     @PreAuthorize("hasRole('MEMBER')")
     @GetMapping("/opening")
-    public ResponseEntity<String> opening(@RequestParam(required = false) String asNo) {
+    public ResponseEntity<String> opening(@RequestParam(required = false) String asNo,
+                                          @RequestHeader(value = HttpHeaders.AUTHORIZATION,
+                                                         required = false) String auth) {
         if (!enabled) {
             return unavailable();
         }
@@ -105,6 +111,7 @@ public class ChatRestController {
                             .queryParamIfPresent("as_id",
                                     java.util.Optional.ofNullable(asNo))
                             .build())
+                    .headers(h -> forward(h, auth))
                     .retrieve()
                     .body(String.class);
 
@@ -129,12 +136,15 @@ public class ChatRestController {
     @PreAuthorize("hasRole('MEMBER')")
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<StreamingResponseBody> stream(@RequestBody ChatReqDto req,
-                                                        @LoginMember PrincipalDetails principal) {
+                                                        @LoginMember PrincipalDetails principal,
+                                                        @RequestHeader(value = HttpHeaders.AUTHORIZATION,
+                                                                       required = false) String auth) {
 
         StreamingResponseBody body = out -> {
             try {
                 restClient.post()
                         .uri("/chat/stream")
+                        .headers(h -> forward(h, auth))
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(payload(req, principal))
                         .exchange((request, response) -> {
@@ -175,6 +185,22 @@ public class ChatRestController {
             body.put("as_id", req.asNo());
         }
         return body;
+    }
+
+    /**
+     * 고객의 JWT 를 챗봇으로 그대로 넘긴다.
+     *
+     * 챗봇은 답변을 만들면서 우리 API(/api/asCase/detail, /api/asCase/estimate)를 다시 부른다.
+     * 그 API 들은 토큰으로 소유자를 검증하므로(getOwned), 토큰이 없으면 401 이 되고
+     * 챗봇은 조용히 더미 데이터(as_dummy.json)로 답한다 — 에러가 나지 않아 알아채기 어렵다.
+     *
+     * 고정 토큰(SPRING_API_TOKEN)으로 대체하면 안 된다.
+     * 모든 고객이 그 토큰 주인으로 취급되어 자기 접수 건도 404 가 된다.
+     */
+    private void forward(HttpHeaders headers, String auth) {
+        if (auth != null && !auth.isBlank()) {
+            headers.set(HttpHeaders.AUTHORIZATION, auth);
+        }
     }
 
     /** 챗봇이 꺼져 있거나 죽었을 때. 화면이 깨지지 않도록 정상 형태로 돌려준다. */

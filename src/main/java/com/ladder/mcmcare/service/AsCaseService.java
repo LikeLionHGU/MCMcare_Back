@@ -340,6 +340,13 @@ public class AsCaseService {
                 .intakeType(c.getIntakeType())
                 .pickupNo(pickupNo)
                 .photoUrlList(photoUrls)
+                .damagePart(c.getDamagePart())
+                .damageType(c.getDamageType().name())
+                .damageTypeLabel(c.getDamageType().getLabel())
+                .damageDescription(c.getDamageDescription())
+                // AI 판정은 견적이 산출된 뒤에만 존재한다
+                .damageCategory(estimateRepository.findByAsCaseId(c.getId())
+                        .map(Estimate::getDamageCategory).orElse(null))
                 .status(c.getStatus().name())
                 .statusLabel(c.getStatus().getLabel())
                 .statusUpdatedAt(c.getStatusUpdatedAt())
