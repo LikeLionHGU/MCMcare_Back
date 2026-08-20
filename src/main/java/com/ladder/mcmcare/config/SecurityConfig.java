@@ -2,6 +2,7 @@ package com.ladder.mcmcare.config;
 
 import com.ladder.mcmcare.exception.ErrorCode;
 import com.ladder.mcmcare.exception.ErrorResponse;
+import com.ladder.mcmcare.repository.MemberRepository;
 import com.ladder.mcmcare.security.AdminKeyFilter;
 import com.ladder.mcmcare.security.JwtAuthorizationFilter;
 import com.ladder.mcmcare.security.JwtProvider;
@@ -34,6 +35,7 @@ public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
     private final FileUrlSigner fileUrlSigner;
+    private final MemberRepository memberRepository;
 
     @Value("${app.admin-key}")
     private String adminKey;
@@ -52,7 +54,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(allowedOrigins));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
@@ -114,7 +116,7 @@ public class SecurityConfig {
 
                 .addFilterBefore(new SignedFileFilter(fileUrlSigner), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new AdminKeyFilter(adminKey), UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new JwtAuthorizationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthorizationFilter(memberRepository, jwtProvider), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

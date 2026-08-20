@@ -190,6 +190,32 @@ public class MemberDto {
         }
     }
 
+    // ── 1-5b. ChangePassword ─────────────────────────────────────
+
+    @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class ChangePasswordReqDto {
+
+        @NotBlank(message = "현재 비밀번호를 입력해 주세요.")
+        private String currentPassword;
+
+        // 회원가입의 비밀번호 검증 규칙과 동일하게 맞춘다.
+        // min = 8 은 프론트 힌트("8자 이상")와 일치시킨다.
+        @NotBlank(message = "새 비밀번호를 입력해 주세요.")
+        @Size(min = 8, max = 50, message = "비밀번호는 8자 이상 50자 이내여야 합니다.")
+        private String newPassword;
+    }
+
+    // ── 1-5c. MessageRes (탈퇴·비밀번호 변경 공통) ──────────────
+
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class MessageResDto {
+        private String message;
+
+        public static MessageResDto of(String message) {
+            return MessageResDto.builder().message(message).build();
+        }
+    }
+
     // ── 1-5. Update ──────────────────────────────────────────────
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
