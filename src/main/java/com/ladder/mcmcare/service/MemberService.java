@@ -174,27 +174,13 @@ public class MemberService {
     /**
      * 회원 탈퇴 (소프트 삭제).
      *
-     * 이메일 가입 회원: 비밀번호로 본인 확인 후 탈퇴.
-     * 구글 가입 회원: 비밀번호가 없으므로 password 검사를 건너뛴다.
+     * 프론트 설계: 비밀번호 재확인 없이 Authorization 토큰 + "탈퇴" 문구 입력으로 본인 확인.
+     * 구글 로그인 계정에는 비밀번호가 없어 비밀번호 방식을 쓰지 않기로 했다.
      * AS 접수 건이 member_id 를 참조하고 있으므로 행을 지우지 않고 개인정보만 익명화한다.
      */
     @Transactional
-    public MemberDto.MessageResDto withdraw(Long memberId, MemberDto.WithdrawReqDto req) {
-
+    public MemberDto.MessageResDto withdraw(Long memberId) {
         Member member = getMember(memberId);
-
-        if (member.getProvider() == com.ladder.mcmcare.domain.AuthProvider.LOCAL) {
-            // 이메일 가입 회원은 비밀번호로 본인 확인
-            if (req.getPassword() == null || req.getPassword().isBlank()) {
-                throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
-            }
-            if (member.getPassword() == null
-                    || !passwordEncoder.matches(req.getPassword(), member.getPassword())) {
-                throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
-            }
-        }
-        // 구글 회원은 비밀번호 검사 없이 탈퇴 처리
-
         member.withdraw();
         return MemberDto.MessageResDto.of("탈퇴가 완료되었습니다.");
     }
@@ -217,10 +203,11 @@ public class MemberService {
             throw new BusinessException(ErrorCode.SOCIAL_PASSWORD_NOT_ALLOWED);
         }
 
-        // 현재 비밀번호 확인
+        // 현재 비밀번호 확인.
+        // 프론트(member.js)가 err.code === "INVALID_CREDENTIALS" 로 분기하므로 그 코드를 쓴다.
         if (member.getPassword() == null
                 || !passwordEncoder.matches(req.getCurrentPassword(), member.getPassword())) {
-            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         // 새 비밀번호가 현재와 동일하면 변경할 이유가 없다

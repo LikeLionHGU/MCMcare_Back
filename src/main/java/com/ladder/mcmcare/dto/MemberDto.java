@@ -209,9 +209,10 @@ public class MemberDto {
         @NotBlank(message = "현재 비밀번호를 입력해 주세요.")
         private String currentPassword;
 
-        // 회원가입의 비밀번호 검증 규칙과 동일하게 맞춘다
+        // 회원가입의 비밀번호 검증 규칙과 동일하게 맞춘다.
+        // min = 8 은 프론트 힌트("8자 이상")와 일치시킨다.
         @NotBlank(message = "새 비밀번호를 입력해 주세요.")
-        @Size(max = 50, message = "비밀번호는 50자 이내여야 합니다.")
+        @Size(min = 8, max = 50, message = "비밀번호는 8자 이상 50자 이내여야 합니다.")
         private String newPassword;
     }
 
