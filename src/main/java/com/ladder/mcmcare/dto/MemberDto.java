@@ -190,17 +190,6 @@ public class MemberDto {
         }
     }
 
-    // ── 1-5a. Withdraw ───────────────────────────────────────────
-
-    @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class WithdrawReqDto {
-        /**
-         * 이메일 가입 회원만 필수. 구글 가입 회원은 비밀번호가 없으므로 null 허용.
-         * 서비스 레이어에서 provider 와 함께 판단한다.
-         */
-        private String password;
-    }
-
     // ── 1-5b. ChangePassword ─────────────────────────────────────
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
