@@ -2,6 +2,7 @@ package com.ladder.mcmcare.security;
 
 import com.ladder.mcmcare.exception.ErrorCode;
 import com.ladder.mcmcare.exception.ErrorResponse;
+import com.ladder.mcmcare.repository.MemberRepository;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -28,6 +29,13 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String HEADER = "Authorization";
     private static final String PREFIX = "Bearer ";
+
+    /**
+     * 탈퇴 전에 발급된 JWT 는 서명은 유효하지만 사용을 막아야 한다.
+     * JwtProvider.parse() 가 DB 를 조회하지 않으므로 필터에서 직접 확인한다.
+     * 탈퇴 시점 이후 토큰 만료 시각까지의 공백을 이렇게 막는다.
+     */
+    private final MemberRepository memberRepository;
 
     /**
      * 인증 없이 접근하는 경로.
@@ -69,6 +77,16 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
             try {
                 PrincipalDetails principal = jwtProvider.parse(token);
                 if (principal != null) {
+                    // 탈퇴 계정의 토큰은 서명이 유효해도 거부한다.
+                    // 탈퇴 직전 발급된 토큰이 만료 전까지 살아있는 것을 막기 위함이다.
+                    boolean withdrawn = memberRepository.findById(principal.getId())
+                            .map(m -> m.isWithdrawn())
+                            .orElse(true);  // 계정 자체가 없으면 거부
+                    if (withdrawn) {
+                        writeError(response, ErrorCode.WITHDRAWN_MEMBER);
+                        return;
+                    }
+
                     var authentication = new UsernamePasswordAuthenticationToken(
                             principal, null, principal.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(authentication);
