@@ -67,4 +67,32 @@ public class MemberRestController {
             @LoginMember PrincipalDetails principal) {
         return ResponseEntity.ok(memberService.update(principal.getId(), reqDto));
     }
+
+    /**
+     * 회원 탈퇴 (소프트 삭제).
+     *
+     * 본인 확인은 Authorization 토큰과 모달의 "탈퇴" 문구 입력으로 대체한다.
+     * 구글 계정에는 비밀번호가 없어 비밀번호 방식을 쓰지 않기로 했다 (프론트 설계).
+     */
+    @PreAuthorize("hasRole('MEMBER')")
+    @DeleteMapping
+    public ResponseEntity<MemberDto.MessageResDto> withdraw(
+            @LoginMember PrincipalDetails principal) {
+        return ResponseEntity.ok(memberService.withdraw(principal.getId()));
+    }
+
+    /**
+     * 비밀번호 변경 (로그인 상태에서만 가능).
+     *
+     * 구글 가입 회원은 변경 불가 (400 반환).
+     * 이메일 찾기/재설정은 메일 인프라가 없으므로 구현하지 않는다.
+     * PUT 을 쓰는 이유: 프론트(member.js)가 put() 으로 호출한다.
+     */
+    @PreAuthorize("hasRole('MEMBER')")
+    @PutMapping("/password")
+    public ResponseEntity<MemberDto.MessageResDto> changePassword(
+            @Valid @RequestBody MemberDto.ChangePasswordReqDto reqDto,
+            @LoginMember PrincipalDetails principal) {
+        return ResponseEntity.ok(memberService.changePassword(principal.getId(), reqDto));
+    }
 }

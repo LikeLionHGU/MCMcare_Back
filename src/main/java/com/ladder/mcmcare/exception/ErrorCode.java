@@ -22,9 +22,14 @@ public enum ErrorCode {
     PAST_DATE(HttpStatus.BAD_REQUEST, "지난 날짜 또는 시간대는 선택할 수 없습니다."),
     SIGN_REQUIRED(HttpStatus.BAD_REQUEST, "서명이 필요합니다."),
 
+    // 400
+    SOCIAL_PASSWORD_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."),
+    SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "새 비밀번호가 현재 비밀번호와 동일합니다."),
+
     // 401
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일, 비밀번호를 다시 한번 확인해주세요."),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "로그인이 만료되었습니다. 다시 로그인해 주세요."),
+    WITHDRAWN_MEMBER(HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다. 다시 로그인해 주세요."),
 
     // 403
     NO_PERMISSION(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
