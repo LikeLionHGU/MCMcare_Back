@@ -114,6 +114,36 @@ CROSS JOIN
 SET @mid = (SELECT member_id FROM member WHERE email = 'user@example.com');
 SET @yr  = YEAR(CURDATE());
 
+-- ── 재실행 대비 정리 ────────────────────────────────────────
+--
+-- 시드는 몇 번을 돌려도 같은 결과가 나와야 한다.
+-- 한 번 실패하면 중간 상태로 남아 DB 를 통째로 비워야 하는 상황을 막는다.
+--
+-- 시연 데이터만 지운다. 사용자가 실제로 만든 접수 건은 건드리지 않는다.
+-- 대상은 아래 5개 번호로 한정한다.
+CREATE TEMPORARY TABLE IF NOT EXISTS demo_as (as_id BIGINT PRIMARY KEY);
+TRUNCATE demo_as;
+
+INSERT INTO demo_as
+SELECT as_id FROM as_case
+WHERE as_no IN (
+    CONCAT('AS-', @yr, '-00101') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00102') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00103') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00104') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00105') COLLATE utf8mb4_general_ci
+);
+
+-- FK 를 거스르지 않도록 자식부터 지운다
+DELETE FROM estimate_item   WHERE estimate_id IN (SELECT estimate_id FROM estimate WHERE as_id IN (SELECT as_id FROM demo_as));
+DELETE FROM estimate        WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM handover_photo  WHERE handover_id IN (SELECT handover_id FROM handover WHERE pickup_id IN (SELECT pickup_id FROM pickup WHERE as_id IN (SELECT as_id FROM demo_as)));
+DELETE FROM handover        WHERE pickup_id IN (SELECT pickup_id FROM pickup WHERE as_id IN (SELECT as_id FROM demo_as));
+DELETE FROM pickup          WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM as_photo        WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM as_status_history WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM as_case         WHERE as_id IN (SELECT as_id FROM demo_as);
+
 -- IGNORE 를 쓰지 않는다. FK 위반 등으로 조용히 건너뛰면 시연 데이터가 비어도 알 수 없다.
 INSERT INTO as_case
     (as_no, member_id, warranty_no, product_type, model_name, purchased_at, purchase_channel,
