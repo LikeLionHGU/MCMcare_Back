@@ -6,7 +6,12 @@ name: deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:        # GitHub 화면에서 수동 실행도 가능하게
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: '시연 데이터 초기화 (seed.sql 다시 주입)'
+        type: boolean
+        default: false
 
 # 배포가 겹치지 않게 한 번에 하나만 돌린다.
 # 연속 푸시가 오면 앞의 것은 취소하고 마지막 것만 배포한다.
@@ -22,6 +27,25 @@ jobs:
     steps:
       - name: 배포
         run: ~/deploy-mcm.sh
+
+      - name: 시드
+        run: |
+          # 시드는 시연 데이터 9건을 지웠다 다시 넣는다.
+          # 매번 돌리면 코드 한 줄 고쳐 푸시할 때마다 화면 데이터가 초기화된다.
+          #
+          #   자동 — seed.sql 이 바뀐 경우에만
+          #   수동 — Actions 탭에서 체크박스를 켜고 실행한 경우
+          cd ~/projects/MCMcare_Back
+
+          if [ "${{ inputs.seed }}" = "true" ]; then
+            echo "수동 요청 — 시연 데이터를 다시 넣는다"
+            ~/seed-mcm.sh
+          elif git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q "seed.sql"; then
+            echo "seed.sql 변경 감지 — 시연 데이터를 다시 넣는다"
+            ~/seed-mcm.sh
+          else
+            echo "변경 없음 — 건너뜀"
+          fi
 
       - name: 상태 확인
         run: |
