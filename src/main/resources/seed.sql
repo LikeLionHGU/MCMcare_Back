@@ -105,13 +105,16 @@ CROSS JOIN
 -- ---------------------------------------------------------------------
 -- 시연용 AS 접수 이력
 --
---    상태 9종을 하나씩 가진 접수 9건. 목록·상세 화면에서 모든 단계를 보여준다.
+--    접수 8건. 목록·상세 화면의 모든 단계를 하나씩 보여준다.
+--
+--    ESTIMATED(접수중)는 넣지 않는다 — 견적만 보고 나간 상태라
+--    목록에 노출되지 않고(AsStatus.isHidden), 1시간 뒤 자동 취소된다.
 --    사진은 uploads/demo/as/demo-1..9.jpg 를 쓴다 (seed-mcm.sh 가 복사).
 --
 --    초기 상태일수록 최근 접수다 — 실제 흐름과 맞아야 자연스럽다.
 --    날짜는 실행 시점 기준 상대값이라 언제 시연해도 어색하지 않다.
 --
---    재실행 안전: 아래 9개 번호에 딸린 데이터를 먼저 지우고 다시 넣는다.
+--    재실행 안전: 아래 8개 번호에 딸린 데이터를 먼저 지우고 다시 넣는다.
 -- ---------------------------------------------------------------------
 SET @mid = (SELECT member_id FROM member WHERE email = 'user@example.com');
 SET @yr  = YEAR(CURDATE());
@@ -131,7 +134,6 @@ TRUNCATE demo_as;
 INSERT INTO demo_as
 SELECT as_id FROM as_case
 WHERE as_no IN (
-    CONCAT('AS-', @yr, '-00101') COLLATE utf8mb4_general_ci,
     CONCAT('AS-', @yr, '-00102') COLLATE utf8mb4_general_ci,
     CONCAT('AS-', @yr, '-00103') COLLATE utf8mb4_general_ci,
     CONCAT('AS-', @yr, '-00104') COLLATE utf8mb4_general_ci,
@@ -153,7 +155,7 @@ DELETE FROM as_status_history WHERE as_id IN (SELECT as_id FROM demo_as);
 DELETE FROM as_case           WHERE as_id IN (SELECT as_id FROM demo_as);
 
 
--- ── 접수 9건 ────────────────────────────────────────────────
+-- ── 접수 8건 ────────────────────────────────────────────────
 -- IGNORE 를 쓰지 않는다. 조용히 건너뛰면 시연 데이터가 비어도 알 수 없다.
 INSERT INTO as_case
     (as_no, member_id, warranty_no, product_type, model_name, purchased_at, purchase_channel,
@@ -161,13 +163,6 @@ INSERT INTO as_case
      expected_completed_at, completed_at, intake_type, current_location, location_type, location_status,
      created_at, updated_at)
 VALUES
-    -- 1. 접수중 — 견적만 받고 아직 픽업 예약 전
-    (CONCAT('AS-', @yr, '-00101'), @mid, 'MCM-W-2025-1001', 'BAG', 'MCM 스타크 백팩 미디엄',
-     '2025-03-14', 'OFFICIAL_STORE', '상단 커버', 'DENT', '외부 충격으로 눌린 자국이 생겼습니다',
-     'ESTIMATED', NOW() - INTERVAL 2 HOUR, NULL,
-     NULL, NULL, NULL, NULL, NULL, NULL,
-     NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 2 HOUR),
-
     -- 2. 접수완료 — 픽업 예약까지 마침
     (CONCAT('AS-', @yr, '-00102'), @mid, NULL, 'BAG', 'MCM 트래블 캐리어 라지',
      '2024-08-22', 'ONLINE_STORE', '측면 하단', 'ETC', '모서리가 찢어져 내용물이 보입니다',
@@ -225,10 +220,10 @@ VALUES
      '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
      NOW() - INTERVAL 35 DAY, NOW() - INTERVAL 8 DAY);
 
--- 방금 넣은 9건의 as_id 범위. 문자열 비교를 피한다 —
+-- 방금 넣은 8건의 as_id 범위. 문자열 비교를 피한다 —
 -- CONCAT 결과와 컬럼의 collation 이 다르면 LIKE 가 "Illegal mix of collations" 로 실패한다.
 SET @demo_first = LAST_INSERT_ID();
-SET @demo_last  = @demo_first + 8;
+SET @demo_last  = @demo_first + 7;
 
 
 -- ── 손상 사진 ───────────────────────────────────────────────

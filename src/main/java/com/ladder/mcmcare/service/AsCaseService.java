@@ -348,6 +348,39 @@ public class AsCaseService {
      * 중간 상태는 정상 흐름에서 수 초 안에 사라지며, 남은 건은 스케줄러가 정리한다.
      */
     /**
+     * 견적만 보고 예약 없이 방치된 접수를 취소한다.
+     *
+     * 이 건들은 목록에 노출되지 않는다(AsStatus.isHidden).
+     * 사용자가 이어서 처리할 경로가 없으므로 남겨두면 DB 에만 쌓인다.
+     *
+     * 하드 삭제하지 않는 이유 — 사진·이력이 FK 로 물려 있고,
+     * 취소 이력을 남겨야 나중에 "왜 사라졌나"를 추적할 수 있다.
+     */
+    @Transactional
+    public int cancelAbandoned(int thresholdMinutes) {
+
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(thresholdMinutes);
+        List<Long> ids = asCaseRepository.findAbandonedIds(threshold);
+
+        int cancelled = 0;
+        for (Long asId : ids) {
+
+            // 조회 시점과 처리 시점 사이에 사용자가 예약했을 수 있다.
+            // 락을 잡고 조건을 다시 확인한다.
+            AsCase asCase = asCaseRepository.findByIdForUpdate(asId).orElse(null);
+            if (asCase == null) continue;
+            if (asCase.getStatus() != AsStatus.ESTIMATED) continue;
+            if (!asCase.getCreatedAt().isBefore(threshold)) continue;
+            if (pickupRepository.existsByAsCaseId(asId)) continue;
+
+            asStatusService.transit(asCase, AsStatus.CANCELLED,
+                    "픽업 예약 없이 방치되어 자동 취소되었습니다");
+            cancelled++;
+        }
+        return cancelled;
+    }
+
+    /**
      * 목록에 실을 대표 사진(첫 장)을 접수 건별로 모은다.
      * 건마다 조회하면 목록 크기만큼 쿼리가 나가므로 한 번에 가져온다.
      */

@@ -65,6 +65,22 @@ public class HandoverScheduler {
         }
     }
 
+    /**
+     * 견적만 보고 예약 없이 방치된 접수를 취소한다.
+     *
+     * 이 건들은 목록에 노출되지 않아 사용자가 이어서 처리할 수 없다.
+     * 남겨두면 DB 에만 쌓이므로 정리한다.
+     *
+     * 분석 미완료 정리와 같은 주기로 돈다. 둘 다 가벼운 조회라 부담이 없다.
+     */
+    @Scheduled(fixedDelayString = "${app.demo.handover-interval-ms}")
+    public void cancelAbandoned() {
+        int cancelled = asCaseService.cancelAbandoned(abandonedMinutes);
+        if (cancelled > 0) {
+            log.info("예약 없이 방치된 접수 {}건을 취소했습니다", cancelled);
+        }
+    }
+
     @Scheduled(fixedDelayString = "${app.demo.handover-interval-ms}")
     public void autoHandover() {
 

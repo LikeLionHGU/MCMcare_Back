@@ -65,6 +65,13 @@ app:
     # 만료되면 새로고침 시 새 URL 을 받는다.
     sign-ttl-seconds: ${FILE_SIGN_TTL_SECONDS:86400}
 
+  as-case:
+    # 견적만 보고 픽업 예약 없이 방치된 접수를 취소하기까지의 시간(분).
+    #
+    # 이 건들은 목록에 노출되지 않는다(AsStatus.isHidden). 화면에서 이어서 예약하는
+    # 경로가 없으므로 남겨두면 DB 에만 쌓인다.
+    abandoned-minutes: ${ABANDONED_MINUTES:60}
+
   estimate:
     # AI 서버는 EUR 로 응답한다. 한국 서비스이므로 원화로 환산해 노출한다.
     # 환율이 바뀌면 이 값만 조정하면 된다 (코드 수정 불필요).

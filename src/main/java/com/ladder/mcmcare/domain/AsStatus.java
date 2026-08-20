@@ -105,7 +105,12 @@ public enum AsStatus {
      * 서버가 그 사이에 죽어 남은 건은 스케줄러가 ESTIMATE_FAILED 로 정리한다.
      */
     public boolean isHidden() {
-        return this == CANCELLED || this == DRAFT || this == ANALYZING;
+        // ESTIMATED 를 숨기는 이유
+        //   견적만 보고 픽업 예약 없이 나간 건이다. 접수가 끝난 게 아니다.
+        //   화면에서 이어서 예약하는 경로를 만들지 않기로 해, 목록에 남으면
+        //   사용자가 손댈 수 없는 항목만 쌓인다.
+        //   방치된 건은 스케줄러가 일정 시간 뒤 취소한다.
+        return this == CANCELLED || this == DRAFT || this == ANALYZING || this == ESTIMATED;
     }
 
     /** 사용자에게 노출되는 진행 중 상태 (목록 · 집계용) */

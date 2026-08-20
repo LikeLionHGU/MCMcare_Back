@@ -63,6 +63,22 @@ public interface AsCaseRepository extends JpaRepository<AsCase, Long> {
      * AI 분석 도중 서버가 중단되어 중간 상태로 남은 건.
      * 정상 흐름에서는 수 초 안에 ESTIMATED 또는 ESTIMATE_FAILED 로 바뀐다.
      */
+    /**
+     * 예약 없이 방치된 접수 건.
+     *
+     * 견적만 보고 나간 건이다. 목록에 노출되지 않아 사용자가 이어서 처리할 수 없으므로
+     * 일정 시간이 지나면 취소해 정리한다.
+     *
+     * 픽업이 하나라도 걸려 있으면 제외한다 — 예약을 진행한 흔적이 있는 건이다.
+     */
+    @Query("""
+            select a.id from AsCase a
+            where a.status = com.ladder.mcmcare.domain.AsStatus.ESTIMATED
+              and a.createdAt < :threshold
+              and not exists (select 1 from Pickup p where p.asCase = a)
+            """)
+    List<Long> findAbandonedIds(@Param("threshold") LocalDateTime threshold);
+
     @Query("select a.id from AsCase a " +
            "where a.status in :statuses and a.createdAt < :threshold")
     List<Long> findStaleIds(@Param("statuses") Collection<AsStatus> statuses,

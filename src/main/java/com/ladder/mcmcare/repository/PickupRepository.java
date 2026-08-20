@@ -48,6 +48,9 @@ public interface PickupRepository extends JpaRepository<Pickup, Long> {
 
     boolean existsByAsCaseIdAndStatus(Long asId, PickupStatus status);
 
+    /** 상태와 무관하게 픽업이 하나라도 있는지. 방치 접수 정리에서 예약 흔적을 확인한다. */
+    boolean existsByAsCaseId(Long asId);
+
     /** 슬롯 가용성 판정 */
     long countByPickupDateAndSlotStartAndStatus(
             LocalDate pickupDate, LocalTime slotStart, PickupStatus status);
