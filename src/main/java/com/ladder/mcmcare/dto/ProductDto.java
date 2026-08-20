@@ -20,6 +20,13 @@ public class ProductDto {
         private String productTypeLabel;
         private String modelName;
         private LocalDate purchasedAt;
+
+        /**
+         * 구매처. 715 화면에서 보증서 번호를 넣으면 이 값도 함께 채워진다.
+         * 접수 요청(POST /api/asCase)에 purchaseChannel 을 실어야 하므로 code 도 함께 준다.
+         */
+        private String purchaseChannel;
+        private String purchaseChannelLabel;
         private int warrantyMonths;
         private LocalDate warrantyExpiresAt;
         private String warrantyScope;
@@ -31,6 +38,10 @@ public class ProductDto {
                     .productTypeLabel(p.getProductType().getLabel())
                     .modelName(p.getModelName())
                     .purchasedAt(p.getPurchasedAt())
+                    .purchaseChannel(p.getPurchaseChannel() == null
+                            ? null : p.getPurchaseChannel().name())
+                    .purchaseChannelLabel(p.getPurchaseChannel() == null
+                            ? null : p.getPurchaseChannel().getLabel())
                     .warrantyMonths(p.getWarrantyMonths())
                     .warrantyExpiresAt(p.getWarrantyExpiresAt())
                     .warrantyScope(p.getWarrantyScope())
