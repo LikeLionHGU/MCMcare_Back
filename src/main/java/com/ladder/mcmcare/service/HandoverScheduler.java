@@ -53,6 +53,10 @@ public class HandoverScheduler {
     @Value("${app.estimate.stale-draft-minutes}")
     private int staleDraftMinutes;
 
+    /** 견적만 보고 이 시간을 넘겨 픽업 예약이 없으면 취소한다 */
+    @Value("${app.as-case.abandoned-minutes}")
+    private int abandonedMinutes;
+
     /**
      * AI 분석 도중 중단되어 남은 접수 건을 실패 처리한다.
      * 자동 인계와 주기를 공유하되, 임계 시간을 넘긴 건만 대상으로 한다.

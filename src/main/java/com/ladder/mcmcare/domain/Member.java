@@ -65,14 +65,6 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private AuthProvider provider;
 
-    /**
-     * 소프트 삭제 시각. null 이면 정상 계정, 값이 있으면 탈퇴 계정.
-     * 하드 삭제를 하지 않는 이유: AS 접수 건이 member_id 를 외래키로 참조하고 있어서
-     * 삭제하면 FK 제약 위반이 발생한다. 이력·통계 보존을 위해 행을 남긴다.
-     */
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     @Builder
     private Member(String email, String password, String name, String phone,
                    LocalDate birthDate, boolean agreedService, boolean agreedPrivacy,
@@ -113,34 +105,5 @@ public class Member extends BaseTimeEntity {
     public void updateProfile(String name, String phone) {
         this.name = name;
         this.phone = phone;
-    }
-
-    /**
-     * 회원 탈퇴 — 소프트 삭제 + 개인정보 익명화.
-     *
-     * email 을 그냥 지우면 UNIQUE 제약상 빈 값이 중복될 수 있다.
-     * member_id 를 포함한 고유값으로 덮어써서 제약 위반 없이 익명화한다.
-     * 나머지 PII(이름·연락처·생년월일·비밀번호)는 복구 불가 수준으로 지운다.
-     */
-    public void withdraw() {
-        this.email = "withdrawn_" + this.id + "@deleted.local";
-        this.name = "탈퇴한 회원";
-        this.phone = null;
-        this.birthDate = null;
-        this.password = null;
-        this.deletedAt = LocalDateTime.now();
-    }
-
-    /**
-     * 비밀번호 변경. 인코딩은 서비스 레이어에서 수행하고 결과만 받는다.
-     * 엔티티가 PasswordEncoder 를 알 필요가 없도록 이미 해시된 값을 받는다.
-     */
-    public void changePassword(String encodedPassword) {
-        this.password = encodedPassword;
-    }
-
-    /** 탈퇴 여부 */
-    public boolean isWithdrawn() {
-        return this.deletedAt != null;
     }
 }

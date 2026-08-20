@@ -80,13 +80,6 @@ public class MemberService {
         Member member = memberRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        // 탈퇴한 계정은 로그인을 차단한다.
-        // INVALID_CREDENTIALS 가 아닌 별도 코드를 쓰는 이유: 프론트가 "탈퇴한 계정"임을
-        // 구분해서 안내 문구를 다르게 보여줄 수 있게 하기 위함이다.
-        if (member.isWithdrawn()) {
-            throw new BusinessException(ErrorCode.WITHDRAWN_MEMBER);
-        }
-
         // 소셜 가입 회원은 비밀번호가 없다.
         // 그대로 matches() 에 넘기면 IllegalArgumentException 으로 500 이 나간다.
         // 계정 존재 여부를 드러내지 않도록 비밀번호 오류와 같은 응답을 준다.
@@ -167,56 +160,6 @@ public class MemberService {
         }
 
         return MemberDto.UpdateResDto.from(member);
-    }
-
-    // ── Withdraw ─────────────────────────────────────────────────
-
-    /**
-     * 회원 탈퇴 (소프트 삭제).
-     *
-     * 프론트 설계: 비밀번호 재확인 없이 Authorization 토큰 + "탈퇴" 문구 입력으로 본인 확인.
-     * 구글 로그인 계정에는 비밀번호가 없어 비밀번호 방식을 쓰지 않기로 했다.
-     * AS 접수 건이 member_id 를 참조하고 있으므로 행을 지우지 않고 개인정보만 익명화한다.
-     */
-    @Transactional
-    public MemberDto.MessageResDto withdraw(Long memberId) {
-        Member member = getMember(memberId);
-        member.withdraw();
-        return MemberDto.MessageResDto.of("탈퇴가 완료되었습니다.");
-    }
-
-    // ── ChangePassword ───────────────────────────────────────────
-
-    /**
-     * 비밀번호 변경.
-     *
-     * 구글 가입 회원은 처음부터 비밀번호가 없으므로 변경을 허용하지 않는다.
-     * "이메일 비밀번호로 전환"은 별도 기획이 필요하므로 여기서는 다루지 않는다.
-     */
-    @Transactional
-    public MemberDto.MessageResDto changePassword(Long memberId, MemberDto.ChangePasswordReqDto req) {
-
-        Member member = getMember(memberId);
-
-        // 구글 로그인 계정은 비밀번호 변경 불가
-        if (member.getProvider() != com.ladder.mcmcare.domain.AuthProvider.LOCAL) {
-            throw new BusinessException(ErrorCode.SOCIAL_PASSWORD_NOT_ALLOWED);
-        }
-
-        // 현재 비밀번호 확인.
-        // 프론트(member.js)가 err.code === "INVALID_CREDENTIALS" 로 분기하므로 그 코드를 쓴다.
-        if (member.getPassword() == null
-                || !passwordEncoder.matches(req.getCurrentPassword(), member.getPassword())) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
-        }
-
-        // 새 비밀번호가 현재와 동일하면 변경할 이유가 없다
-        if (passwordEncoder.matches(req.getNewPassword(), member.getPassword())) {
-            throw new BusinessException(ErrorCode.SAME_AS_CURRENT_PASSWORD);
-        }
-
-        member.changePassword(passwordEncoder.encode(req.getNewPassword()));
-        return MemberDto.MessageResDto.of("비밀번호가 변경되었습니다.");
     }
 
     // ── 내부 ─────────────────────────────────────────────────────
