@@ -53,14 +53,20 @@ public class HandoverService {
      */
     /**
      * 자동 인계 스케줄러 진입점.
-     * 트랜잭션 안에서 pickup 을 다시 조회해 managed 상태로 만든다.
+     *
+     * 트랜잭션 안에서 pickup 을 다시 조회해 managed 상태로 만들고, 행을 잠근다.
+     * 락이 없으면 아래 complete() 의 상태 검사가 무의미해진다 —
+     * 고객 취소가 같은 행을 잠그고 CANCELLED 로 바꾸는 사이 이쪽은 BOOKED 를 읽고
+     * 그대로 인계를 진행할 수 있다.
+     *
+     * 수동 인계(completeByDriver)와 동일한 락 전략을 쓴다.
      */
     @Transactional
     public LocalDateTime completeById(Long pickupId,
                                       List<String> photoUrls,
                                       String customerSignUrl,
                                       String driverSignUrl) {
-        Pickup pickup = pickupRepository.findById(pickupId)
+        Pickup pickup = pickupRepository.findByIdForUpdate(pickupId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
         return complete(pickup, photoUrls, customerSignUrl, driverSignUrl);
     }

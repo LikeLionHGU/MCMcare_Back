@@ -59,21 +59,22 @@ public class AsCaseFacade {
         // 접수번호는 동시 요청이 같은 값을 만들 수 있다. UNIQUE 위반이 나면 다시 시도하는데,
         // 재시도를 트랜잭션 안에서 하면 flush 실패로 오염된 세션을 이어 쓰게 된다.
         // 그래서 트랜잭션을 통째로 다시 연다.
-        Long asId = createDraftWithRetry(memberId, req, photoUrls);
-
-        // ② TX 밖 — 외부 I/O
-        EstimateResult result;
+        // DB 저장이 실패하면 방금 올린 파일을 지운다.
+        // 접수가 만들어지지 않았으므로 그 파일을 참조할 방법이 없다.
+        Long asId;
         try {
-            AsCase asCase = asCaseService.getById(asId);
-            result = estimatePort.analyze(asCase, asCaseService.photosOf(asId));
-        } catch (Exception e) {
-            log.error("견적 분석 실패 asId={}", asId, e);
-            asCaseService.markFailed(asId);                       // ③-a TX
-            throw new BusinessException(ErrorCode.ESTIMATE_FAILED, asCaseService.getAsNo(asId));
+            asId = createDraftWithRetry(memberId, req, photoUrls);
+        } catch (RuntimeException e) {
+            fileService.deleteQuietly(photoUrls);
+            throw e;
         }
 
-        // ③-b TX — 견적 반영
-        return asCaseService.applyEstimate(asId, result);
+        // ② TX — DRAFT → ANALYZING 선점
+        //    분석 중임을 상태로 남겨야 이후 결과 반영을 안전하게 검증할 수 있다.
+        asCaseService.claimForAnalysis(asId, AsStatus.DRAFT);
+
+        // ③ TX 밖에서 AI 호출 → ④ TX 에서 결과 반영
+        return analyzeAndApply(asId);
     }
 
     /**
@@ -100,6 +101,27 @@ public class AsCaseFacade {
         if (!PhotoType.isValidCombination(types)) {
             throw new BusinessException(ErrorCode.PHOTO_TYPE_REQUIRED);
         }
+    }
+
+    /**
+     * AI 를 호출하고 결과를 반영한다. 호출 전에 ANALYZING 으로 선점돼 있어야 한다.
+     *
+     * AI 호출은 트랜잭션 밖에서 한다 — 수십 초가 걸리므로 커넥션을 붙들면 안 된다.
+     * 결과 반영과 실패 처리는 각각 짧은 트랜잭션에서 락을 잡고 상태를 다시 확인한다.
+     */
+    private AsCaseDto.CreateResDto analyzeAndApply(Long asId) {
+
+        EstimateResult result;
+        try {
+            AsCase asCase = asCaseService.getById(asId);
+            result = estimatePort.analyze(asCase, asCaseService.photosOf(asId));
+        } catch (Exception e) {
+            log.error("견적 분석 실패 asId={}", asId, e);
+            asCaseService.markFailed(asId);
+            throw new BusinessException(ErrorCode.ESTIMATE_FAILED, asCaseService.getAsNo(asId));
+        }
+
+        return asCaseService.applyEstimate(asId, result);
     }
 
     private Long createDraftWithRetry(Long memberId,
@@ -148,19 +170,18 @@ public class AsCaseFacade {
         if (asCase.getStatus() == AsStatus.ESTIMATED) {
             throw new BusinessException(ErrorCode.ALREADY_ESTIMATED);
         }
-        if (asCase.getStatus() != AsStatus.ESTIMATE_FAILED) {
+        // ESTIMATE_FAILED → ANALYZING 선점.
+        //
+        // 선점하지 않으면 AI 호출 20초 사이에 고객이 취소할 수 있고
+        // (ESTIMATE_FAILED 는 취소 가능 상태다), 나중에 도착한 결과가
+        // 취소된 건을 ESTIMATED 로 되살린다.
+        //
+        // 실패하면 이미 다른 요청이 분석 중이거나 상태가 바뀐 것이다.
+        if (!asCaseService.claimForAnalysis(asCase.getId(), AsStatus.ESTIMATE_FAILED)) {
             throw new BusinessException(ErrorCode.INVALID_STATUS);
         }
 
-        EstimateResult result;
-        try {
-            result = estimatePort.analyze(asCase, asCaseService.photosOf(asCase.getId()));
-        } catch (Exception e) {
-            log.error("견적 재분석 실패 asNo={}", asNo, e);
-            throw new BusinessException(ErrorCode.ESTIMATE_FAILED, asNo);
-        }
-
-        asCaseService.applyEstimate(asCase.getId(), result);
+        analyzeAndApply(asCase.getId());
         return AsCaseDto.RetryResDto.from(asCaseService.getById(asCase.getId()));
     }
 }

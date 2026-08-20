@@ -126,6 +126,32 @@ public class AsCaseService {
     // ── Create (3단계: 견적 반영) ────────────────────────────────
 
     /**
+     * AI 호출 직전에 ANALYZING 으로 선점한다.
+     *
+     * [왜 필요한가]
+     * AI 호출은 수십 초 걸린다. 그 사이 고객이 접수를 취소할 수 있는데,
+     * 취소는 ESTIMATED · ESTIMATE_FAILED 에서만 허용된다.
+     * ANALYZING 으로 바꿔 두면 분석 중에는 취소가 막히고,
+     * "취소했는데 나중에 견적이 반영되어 되살아나는" 일이 생기지 않는다.
+     *
+     * 짧은 트랜잭션으로 락을 잡았다 바로 놓는다. AI 호출은 이 트랜잭션 밖에서 한다.
+     *
+     * @return 선점에 성공하면 true. 이미 다른 요청이 가져갔거나 상태가 바뀌었으면 false.
+     */
+    @Transactional
+    public boolean claimForAnalysis(Long asId, AsStatus expected) {
+
+        AsCase asCase = asCaseRepository.findByIdForUpdate(asId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
+
+        if (asCase.getStatus() != expected) {
+            return false;
+        }
+        asStatusService.transit(asCase, AsStatus.ANALYZING, "AI 분석 중");
+        return true;
+    }
+
+    /**
      * AI 분석 결과를 저장하고 상태를 전이한다.
      *
      * 저장하지 않으면 조회할 때마다 AI 를 다시 호출해야 한다.
@@ -136,7 +162,15 @@ public class AsCaseService {
     @Transactional
     public AsCaseDto.CreateResDto applyEstimate(Long asId, EstimateResult result) {
 
-        AsCase asCase = getById(asId);
+        AsCase asCase = asCaseRepository.findByIdForUpdate(asId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
+
+        // 분석을 시작할 때 선점해 둔 상태 그대로여야 반영한다.
+        // 그 사이 취소되었거나 다른 요청이 이미 결과를 넣었다면 덮어쓰지 않는다.
+        if (asCase.getStatus() != AsStatus.ANALYZING) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS);
+        }
+
         saveEstimate(asCase, result);
         asStatusService.transit(asCase, AsStatus.ESTIMATED, "AI 예상 견적 산출 완료");
         return AsCaseDto.CreateResDto.from(asCase);
@@ -170,8 +204,8 @@ public class AsCaseService {
         for (int i = 0; i < items.size(); i++) {
             EstimateResult.Item item = items.get(i);
             estimate.addItem(estimateItemRepository.save(EstimateItem.of(
-                    estimate, item.getRepairItemName(),
-                    item.getEstimatedPrice(), item.getMinPrice(), item.getMaxPrice(), i)));
+                    estimate, item.getRepairItemName(), item.getEstimatedPrice(),
+                    item.getMinPrice(), item.getMaxPrice(), item.getCostConfidence(), i)));
         }
     }
 
@@ -191,17 +225,37 @@ public class AsCaseService {
         List<Long> staleIds = asCaseRepository.findStaleIds(
                 List.of(AsStatus.DRAFT, AsStatus.ANALYZING), threshold);
 
+        int recovered = 0;
         for (Long asId : staleIds) {
-            AsCase asCase = getById(asId);
+
+            // ID 를 뽑은 시점과 상태를 바꾸는 시점 사이에 AI 가 완료될 수 있다.
+            // 락을 잡고 조건을 다시 확인하지 않으면 성공한 견적을 실패로 되돌린다.
+            AsCase asCase = asCaseRepository.findByIdForUpdate(asId).orElse(null);
+            if (asCase == null) continue;
+
+            boolean stillStale = (asCase.getStatus() == AsStatus.DRAFT
+                    || asCase.getStatus() == AsStatus.ANALYZING)
+                    && asCase.getCreatedAt().isBefore(threshold);
+            if (!stillStale) continue;
+
             asStatusService.transit(asCase, AsStatus.ESTIMATE_FAILED,
                     "분석이 완료되지 않아 실패 처리되었습니다");
+            recovered++;
         }
-        return staleIds.size();
+        return recovered;
     }
 
     @Transactional
     public void markFailed(Long asId) {
-        AsCase asCase = getById(asId);
+
+        AsCase asCase = asCaseRepository.findByIdForUpdate(asId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
+
+        // 분석 중이던 건만 실패로 돌린다.
+        // 이미 취소됐다면 그 상태를 유지해야 한다 — 취소한 건이 실패로 바뀌면 목록에 다시 뜬다.
+        if (asCase.getStatus() != AsStatus.ANALYZING) {
+            return;
+        }
         asStatusService.transit(asCase, AsStatus.ESTIMATE_FAILED, "AI 분석 실패");
     }
 
@@ -228,6 +282,7 @@ public class AsCaseService {
                         .estimatedPrice(i.getEstimatedPrice())
                         .minPrice(i.getMinPrice())
                         .maxPrice(i.getMaxPrice())
+                        .costConfidence(i.getCostConfidence())
                         .build())
                 .toList();
 

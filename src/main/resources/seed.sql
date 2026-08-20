@@ -103,9 +103,96 @@ CROSS JOIN
 
 
 -- ---------------------------------------------------------------------
+-- 시연용 AS 접수 이력
+--
+--    목록·상세 화면이 비어 보이지 않도록 미리 넣어 둔다.
+--    완료 3건 + 진행 중 2건 구성 — 710 화면의 전체/진행중/완료 탭이 모두 살아난다.
+--
+--    날짜는 실행 시점 기준 상대값으로 만든다.
+--    고정값을 박으면 시연 날짜에 따라 "3년 전 접수"처럼 보인다.
+-- ---------------------------------------------------------------------
+SET @mid = (SELECT member_id FROM member WHERE email = 'user@example.com');
+SET @yr  = YEAR(CURDATE());
+
+-- IGNORE 를 쓰지 않는다. FK 위반 등으로 조용히 건너뛰면 시연 데이터가 비어도 알 수 없다.
+INSERT INTO as_case
+    (as_no, member_id, warranty_no, product_type, model_name, purchased_at, purchase_channel,
+     damage_part, damage_type, damage_description, status, status_updated_at, status_message,
+     expected_completed_at, completed_at, intake_type, current_location, location_type, location_status,
+     created_at, updated_at)
+VALUES
+    -- 완료 3건
+    (CONCAT('AS-', @yr, '-00101'), @mid, 'MCM-W-2022-0301', 'BAG', 'MCM 스타크 백팩 미디엄',
+     '2023-04-15', 'OFFICIAL_STORE', '숄더 스트랩 연결부', 'STITCHING', '스트랩 봉제선이 뜯어졌습니다',
+     'COMPLETED', NOW() - INTERVAL 40 DAY, '수선이 완료되어 고객님께 전달되었습니다',
+     CURDATE() - INTERVAL 40 DAY, CURDATE() - INTERVAL 40 DAY,
+     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
+     NOW() - INTERVAL 62 DAY, NOW() - INTERVAL 40 DAY),
+
+    (CONCAT('AS-', @yr, '-00102'), @mid, 'MCM-W-2025-1001', 'WALLET', 'MCM 비세토스 장지갑',
+     '2024-01-20', 'DEPARTMENT_STORE', '카드 슬롯', 'SCRATCH', '카드 슬롯 안쪽이 긁혔습니다',
+     'COMPLETED', NOW() - INTERVAL 25 DAY, '수선이 완료되어 고객님께 전달되었습니다',
+     CURDATE() - INTERVAL 25 DAY, CURDATE() - INTERVAL 25 DAY,
+     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
+     NOW() - INTERVAL 45 DAY, NOW() - INTERVAL 25 DAY),
+
+    (CONCAT('AS-', @yr, '-00103'), @mid, NULL, 'BAG', 'MCM 밀라 미니 크로스백',
+     '2023-11-05', 'ONLINE_STORE', '금속 체인', 'METAL_PART', '체인 도금이 벗겨졌습니다',
+     'COMPLETED', NOW() - INTERVAL 12 DAY, '수선이 완료되어 고객님께 전달되었습니다',
+     CURDATE() - INTERVAL 12 DAY, CURDATE() - INTERVAL 12 DAY,
+     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
+     NOW() - INTERVAL 33 DAY, NOW() - INTERVAL 12 DAY),
+
+    -- 진행 중 2건
+    (CONCAT('AS-', @yr, '-00104'), @mid, 'MCM-W-2026-0110', 'BAG', 'MCM 클래식 백팩 미디엄',
+     '2024-06-10', 'OFFICIAL_STORE', '지퍼 슬라이더', 'METAL_PART', '지퍼가 중간에 걸립니다',
+     'REPAIRING', NOW() - INTERVAL 2 DAY, '수선 작업을 진행하고 있습니다',
+     CURDATE() + INTERVAL 6 DAY, NULL,
+     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 작업 중',
+     NOW() - INTERVAL 9 DAY, NOW() - INTERVAL 2 DAY),
+
+    (CONCAT('AS-', @yr, '-00105'), @mid, NULL, 'BAG', 'MCM 로엔 카메라백',
+     '2024-09-01', 'DUTY_FREE', '가죽 표면', 'DISCOLOR', '앞면 가죽이 변색되었습니다',
+     'INSPECTING', NOW() - INTERVAL 1 DAY, '품질 검수를 진행하고 있습니다',
+     CURDATE() + INTERVAL 3 DAY, NULL,
+     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '품질 검수 중',
+     NOW() - INTERVAL 15 DAY, NOW() - INTERVAL 1 DAY);
+
+
+-- 진행 이력 — 타임라인 화면이 단계별로 채워지도록
+-- 완료 건은 7단계 전부, 진행 중 건은 현재 단계까지만
+INSERT INTO as_status_history (as_id, status, description, occurred_at)
+SELECT a.as_id, s.status, s.description,
+       a.created_at + INTERVAL s.offset_day DAY
+FROM as_case a
+CROSS JOIN (
+    SELECT 'PICKED_UP' status, '기사 인계 후 수선 센터로 이동' description, 1 offset_day, 1 ord
+    UNION ALL SELECT 'RECEIVED',   '수선 센터 입고 및 실물 진단 시작', 2,  2
+    UNION ALL SELECT 'DIAGNOSED',  '진단 결과에 따라 수선 범위 확정',   4,  3
+    UNION ALL SELECT 'REPAIRING',  '확정된 범위로 수선 작업 진행',     6,  4
+    UNION ALL SELECT 'INSPECTING', '수선 완료 후 품질 기준 최종 점검',  14, 5
+    UNION ALL SELECT 'SHIPPING',   '검수 완료 후 고객 배송 진행',      18, 6
+    UNION ALL SELECT 'COMPLETED',  '수선 완료',                     20, 7
+) s
+WHERE a.member_id = @mid
+  AND a.as_no LIKE CONCAT('AS-', @yr, '-001%')
+  AND s.ord <= CASE a.status
+        WHEN 'COMPLETED'  THEN 7
+        WHEN 'SHIPPING'   THEN 6
+        WHEN 'INSPECTING' THEN 5
+        WHEN 'REPAIRING'  THEN 4
+        WHEN 'DIAGNOSED'  THEN 3
+        WHEN 'RECEIVED'   THEN 2
+        ELSE 1
+      END;
+
+
+-- ---------------------------------------------------------------------
 -- 확인
 -- ---------------------------------------------------------------------
 SELECT 'driver'      AS table_name, COUNT(*) AS cnt FROM driver
 UNION ALL SELECT 'member',      COUNT(*) FROM member
 UNION ALL SELECT 'product',     COUNT(*) FROM product
-UNION ALL SELECT 'pickup_slot', COUNT(*) FROM pickup_slot;
+UNION ALL SELECT 'pickup_slot', COUNT(*) FROM pickup_slot
+UNION ALL SELECT 'as_case',     COUNT(*) FROM as_case
+UNION ALL SELECT 'as_history',  COUNT(*) FROM as_status_history;

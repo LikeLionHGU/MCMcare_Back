@@ -156,6 +156,8 @@ public class AsCaseDto {
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class EstimateItemDto {
         private String repairItemName;
+        /** 비용 근거 수준 — 확인됨 / 부분확인 / 가설. 실측 단가가 없으면 "가설"이다. */
+        private String costConfidence;
 
         /** 손상 정도가 반영된 추정 금액. 화면의 "약 N원" */
         private int estimatedPrice;
@@ -170,6 +172,7 @@ public class AsCaseDto {
                     .estimatedPrice(i.getEstimatedPrice())
                     .minPrice(i.getMinPrice())
                     .maxPrice(i.getMaxPrice())
+                    .costConfidence(i.getCostConfidence())
                     .build();
         }
     }

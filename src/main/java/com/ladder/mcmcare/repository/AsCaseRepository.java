@@ -32,6 +32,16 @@ public interface AsCaseRepository extends JpaRepository<AsCase, Long> {
     @Query("select a from AsCase a where a.asNo = :asNo")
     Optional<AsCase> findByAsNoForUpdate(@Param("asNo") String asNo);
 
+    /**
+     * AI 분석 흐름용 — AS 행을 잠근다.
+     *
+     * 분석 시작(ANALYZING 선점) · 결과 반영 · 실패 처리 · stale 복구가 모두 같은 행을 다툰다.
+     * 여기에 고객 취소(findByAsNoForUpdate)까지 더해지므로 같은 락을 써야 한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AsCase a where a.id = :asId")
+    Optional<AsCase> findByIdForUpdate(@Param("asId") Long asId);
+
     boolean existsByAsNo(String asNo);
 
     /**

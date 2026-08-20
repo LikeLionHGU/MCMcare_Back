@@ -30,7 +30,14 @@ public class AdminService {
     @Transactional
     public AdminDto.UpdateStatusResDto updateStatus(String asNo, AdminDto.UpdateStatusReqDto req) {
 
-        AsCase asCase = asCaseRepository.findByAsNo(asNo)
+        // AS 행을 잠근다.
+        //
+        // 락이 없으면 아래 상태 검사가 무의미해진다.
+        //   · 관리자 둘이 동시에 PICKED_UP 을 읽으면 각각 다른 단계로 전이하고 이력도 둘 다 남는다
+        //   · 고객이 접수를 취소하는 사이 관리자가 진행시킬 수 있다 (취소도 같은 행을 잠근다)
+        //
+        // AsCase 에는 @Version 이 없어 stale 갱신을 검출할 다른 수단이 없다.
+        AsCase asCase = asCaseRepository.findByAsNoForUpdate(asNo)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NO_MATCHING_DATA));
 
         if (asCase.getStatus() == AsStatus.CANCELLED) {

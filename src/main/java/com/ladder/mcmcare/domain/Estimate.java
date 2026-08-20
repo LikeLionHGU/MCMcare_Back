@@ -53,7 +53,8 @@ public class Estimate extends BaseCreatedEntity {
     private String confidenceGrade;
 
     /** "제출 사진 3장 기반" */
-    @Column(name = "confidence_note", length = 100)
+    /** "제출 사진 2장 기반 · 가방 전체가 사진에 담기지 않아 …" 형태. 경고가 붙으면 길어진다 */
+    @Column(name = "confidence_note", length = 200)
     private String confidenceNote;
 
     /** 손상을 탐지하지 못한 경우의 안내. 값이 있으면 itemList 는 비어 있다. */

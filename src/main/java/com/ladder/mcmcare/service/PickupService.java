@@ -87,7 +87,7 @@ public class PickupService {
 
         for (PickupSlot s : slots) {
             boolean full = booked.getOrDefault(key(s.getSlotDate(), s.getSlotStart()), 0L) >= s.getCapacity();
-            boolean past = s.getSlotDate().isEqual(today) && !s.getSlotStart().isAfter(now);
+            boolean past = s.isPast(today, now);
 
             grouped.computeIfAbsent(s.getSlotDate(), d -> new ArrayList<>())
                     .add(PickupDto.SlotItemDto.builder()
@@ -132,8 +132,9 @@ public class PickupService {
         if (slot.isBlocked()) throw new BusinessException(ErrorCode.SLOT_FULL);
 
         LocalDate today = LocalDate.now();
-        if (slot.getSlotDate().isBefore(today)
-                || (slot.getSlotDate().isEqual(today) && !slot.getSlotStart().isAfter(LocalTime.now()))) {
+        // 조회(slots)와 같은 규칙을 쓴다. 규칙이 갈라지면
+        // "예약 가능"으로 보여준 슬롯이 예약 단계에서 거절되는 일이 생긴다.
+        if (slot.isPast(today, LocalTime.now())) {
             throw new BusinessException(ErrorCode.PAST_DATE);
         }
 

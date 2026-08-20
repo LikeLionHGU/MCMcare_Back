@@ -83,6 +83,14 @@ public class ModelEstimateAdapter implements EstimatePort {
             throw new IllegalStateException("AI 서버로 보낼 사진 파일이 없습니다.");
         }
 
+        // 일부만 유실된 경우는 분석을 계속하되 흔적을 남긴다.
+        // 조용히 넘어가면 "왜 신뢰도가 낮지" 를 나중에 추적할 수 없다.
+        int sent = body.get("files").size();
+        if (sent < photos.size()) {
+            log.warn("사진 {}장 중 {}장만 전송됨 — 나머지는 파일을 찾지 못했다. asNo={}",
+                    photos.size(), sent, asCase.getAsNo());
+        }
+
         // 원문을 함께 보관한다. 표시된 금액이 이상할 때 원인을 추적하는 용도다.
         String raw = restClient.post()
                 .uri("/diagnose/multi")
@@ -100,7 +108,14 @@ public class ModelEstimateAdapter implements EstimatePort {
             throw new IllegalStateException("AI 서버 응답을 해석할 수 없습니다.");
         }
 
-        return toEstimateResult(res, photos.size(), raw);
+        // 실제로 전송된 장수를 쓴다.
+        //
+        // DB 에는 3장인데 디스크에서 1장이 사라졌다면 위 루프가 그 장을 건너뛴다.
+        // photos.size() 를 쓰면 "제출 사진 3장 기반"이라고 표시되지만 AI 는 2장만 봤다.
+        // AI 응답의 n_images 가 실제 처리한 장수다.
+        int analyzed = res.getNImages() > 0 ? res.getNImages() : body.get("files").size();
+
+        return toEstimateResult(res, analyzed, raw);
     }
 
     private EstimateResult toEstimateResult(AiDiagnoseResponse res, int photoCount, String raw) {
@@ -114,7 +129,7 @@ public class ModelEstimateAdapter implements EstimatePort {
                     .damageCategory("손상 미확인")
                     .damageSeverity(null)
                     .confidenceGrade("낮음")
-                    .confidenceNote(mapper.confidenceNote(photoCount))
+                    .confidenceNote(mapper.confidenceNote(photoCount, true))
                     .items(List.of())
                     .noDamageNotice(EstimateMapper.NO_DAMAGE_NOTICE)
                     .rawResponse(raw)
@@ -134,6 +149,7 @@ public class ModelEstimateAdapter implements EstimatePort {
                     .estimatedPrice(mapper.toKrwRound(cost.getPointEstimate()))
                     .minPrice(mapper.toKrwFloor(cost.getMin()))
                     .maxPrice(mapper.toKrwCeil(cost.getMax()))
+                    .costConfidence(d.getCostConfidenceTag())
                     .build());
         }
 
@@ -142,11 +158,21 @@ public class ModelEstimateAdapter implements EstimatePort {
                 .max(Comparator.naturalOrder())
                 .orElse(0.0);
 
+        // 하나라도 가방 박스를 기준으로 계산됐으면 그나마 신뢰할 수 있다.
+        // 전부 실패했다면 면적비가 이미지 전체 기준이라 심각도·금액이 부정확하다.
+        boolean bagBoxDetected = damages.stream()
+                .anyMatch(AiDiagnoseResponse.Damage::isBagBoxDetected);
+
+        if (!bagBoxDetected) {
+            log.warn("가방 전체 박스 미탐지 — 면적비를 이미지 전체 기준으로 계산함. warnings={}",
+                    res.getWarnings());
+        }
+
         return EstimateResult.builder()
                 .damageCategory(mapper.joinCategories(categories))
                 .damageSeverity(mapper.severityLabel(res.getOverallSeverity()))
-                .confidenceGrade(mapper.confidenceGrade(maxConfidence))
-                .confidenceNote(mapper.confidenceNote(photoCount))
+                .confidenceGrade(mapper.confidenceGrade(maxConfidence, bagBoxDetected))
+                .confidenceNote(mapper.confidenceNote(photoCount, bagBoxDetected))
                 .items(items)
                 .rawResponse(raw)
                 .build();

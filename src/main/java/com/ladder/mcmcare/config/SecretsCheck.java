@@ -35,7 +35,8 @@ public class SecretsCheck implements ApplicationListener<ApplicationReadyEvent> 
     private static final Map<String, String> DEFAULTS = Map.of(
             "JWT_SECRET",       "local-dev-only-secret-key-not-for-production-32b",
             "ADMIN_KEY",        "local-dev-only-admin-key",
-            "FILE_SIGN_SECRET", "local-dev-only-file-sign-secret-key-32b"
+            "FILE_SIGN_SECRET", "local-dev-only-file-sign-secret-key-32b",
+            "DB_PASSWORD",      "local-dev-only-db-password"
     );
 
     private final Environment env;
@@ -44,12 +45,14 @@ public class SecretsCheck implements ApplicationListener<ApplicationReadyEvent> 
     public SecretsCheck(Environment env,
                         @Value("${app.jwt.secret}") String jwtSecret,
                         @Value("${app.admin-key}") String adminKey,
-                        @Value("${app.file.sign-secret}") String fileSignSecret) {
+                        @Value("${app.file.sign-secret}") String fileSignSecret,
+                        @Value("${spring.datasource.password}") String dbPassword) {
         this.env = env;
         this.current = Map.of(
                 "JWT_SECRET", jwtSecret,
                 "ADMIN_KEY", adminKey,
-                "FILE_SIGN_SECRET", fileSignSecret
+                "FILE_SIGN_SECRET", fileSignSecret,
+                "DB_PASSWORD", dbPassword
         );
     }
 

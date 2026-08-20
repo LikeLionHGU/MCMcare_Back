@@ -63,6 +63,12 @@ public class EstimateResult {
 
         /** 카테고리 최대 구간 (손상 정도 무관) */
         private int maxPrice;
+
+        /**
+         * 비용 산출 근거 수준 — 확인됨 / 부분확인 / 가설.
+         * 실측 단가가 없는 손상은 "가설"이다. 사용자에게 참고 추정치임을 알리기 위해 함께 내려준다.
+         */
+        private String costConfidence;
     }
 
     /** 손상 미탐지 여부 */

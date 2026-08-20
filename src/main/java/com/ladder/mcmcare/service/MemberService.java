@@ -15,6 +15,7 @@ import com.ladder.mcmcare.security.Role;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,8 +55,16 @@ public class MemberService {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
 
-        Member member = memberRepository.save(
-                req.toEntity(passwordEncoder.encode(req.getPassword())));
+        // existsByEmail 과 save 사이에 다른 요청이 끼어들 수 있다.
+        // 미커밋 트랜잭션은 조회로 보이지 않으므로 둘 다 검사를 통과한 뒤
+        // 한쪽만 UNIQUE 제약에 걸린다. 그대로 두면 전역 핸들러가 500 으로 내보낸다.
+        Member member;
+        try {
+            member = memberRepository.saveAndFlush(
+                    req.toEntity(passwordEncoder.encode(req.getPassword())));
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+        }
 
         // 마케팅 동의는 시점 기록이 법적 의무이므로 이력으로 남긴다
         marketingConsentRepository.save(

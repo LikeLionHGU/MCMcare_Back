@@ -73,14 +73,42 @@ public class EstimateMapper {
     }
 
     /** detection_confidence 최댓값 → 등급 */
-    public String confidenceGrade(double maxConfidence) {
-        if (maxConfidence >= CONFIDENCE_HIGH) return "높음";
-        if (maxConfidence >= CONFIDENCE_MID)  return "보통";
-        return "낮음";
+    /**
+     * 분석 신뢰도 등급.
+     *
+     * 탐지 confidence 만 보면 안 된다.
+     * 모델이 손상을 0.91 로 확신해도, 가방 전체 박스를 못 찾았다면
+     * 손상 면적비를 이미지 전체 기준으로 계산한 것이라 심각도와 금액이 부정확하다.
+     * Vision 쪽에서도 이 경우 경고를 내려보낸다.
+     *
+     * @param bagBoxDetected 손상 중 하나라도 가방 박스를 기준으로 계산됐는지
+     */
+    public String confidenceGrade(double maxConfidence, boolean bagBoxDetected) {
+        String grade = maxConfidence >= CONFIDENCE_HIGH ? "높음"
+                     : maxConfidence >= CONFIDENCE_MID  ? "보통"
+                     : "낮음";
+
+        // 기준 박스가 없으면 한 단계 낮춘다. "높음"이라 표시해 놓고
+        // 실제로는 이미지 전체를 가방으로 가정한 값이면 사용자를 오도한다.
+        if (!bagBoxDetected) {
+            return switch (grade) {
+                case "높음" -> "보통";
+                case "보통" -> "낮음";
+                default -> "낮음";
+            };
+        }
+        return grade;
     }
 
-    public String confidenceNote(int photoCount) {
-        return "제출 사진 %d장 기반".formatted(photoCount);
+    /**
+     * 신뢰도 옆에 붙는 근거 문구.
+     * 가방 전체가 안 잡혔으면 그 이유를 함께 알린다 — 사진을 다시 올릴 판단 근거가 된다.
+     */
+    public String confidenceNote(int photoCount, boolean bagBoxDetected) {
+        String base = "제출 사진 %d장 기반".formatted(photoCount);
+        return bagBoxDetected
+                ? base
+                : base + " · 가방 전체가 사진에 담기지 않아 손상 범위 추정이 부정확할 수 있습니다";
     }
 
     /**

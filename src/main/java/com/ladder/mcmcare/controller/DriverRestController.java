@@ -76,12 +76,22 @@ public class DriverRestController {
 
         // 엔티티가 아니라 번호를 넘긴다.
         // 조회 트랜잭션이 끝난 엔티티는 detached 라 LAZY 초기화와 flush 가 실패한다.
-        LocalDateTime handedOverAt = handoverService.completeByDriver(
-                principal.getId(),
-                pickupNo,
-                fileService.upload(photos, HANDOVER_DIR),
-                fileService.upload(customerSign, SIGN_DIR),
-                fileService.upload(driverSign, SIGN_DIR));
+        // 업로드를 먼저 끝내고 URL 을 모아 둔다.
+        // 인계 처리가 실패하면(이미 취소됐거나 다른 기사가 처리했거나) 전부 지운다.
+        List<String> photoUrls = fileService.upload(photos, HANDOVER_DIR);
+        String customerSignUrl = fileService.upload(customerSign, SIGN_DIR);
+        String driverSignUrl = fileService.upload(driverSign, SIGN_DIR);
+
+        LocalDateTime handedOverAt;
+        try {
+            handedOverAt = handoverService.completeByDriver(
+                    principal.getId(), pickupNo, photoUrls, customerSignUrl, driverSignUrl);
+        } catch (RuntimeException e) {
+            fileService.deleteQuietly(photoUrls);
+            fileService.deleteQuietly(customerSignUrl);
+            fileService.deleteQuietly(driverSignUrl);
+            throw e;
+        }
 
         return ResponseEntity.ok(DriverDto.HandoverResDto.builder()
                 .pickupNo(pickupNo)

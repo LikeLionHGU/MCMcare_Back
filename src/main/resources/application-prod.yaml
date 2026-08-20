@@ -9,6 +9,8 @@
 #   FILE_SIGN_SECRET   파일 URL 서명 키
 #   DB_PASSWORD        DB 비밀번호
 #
+# 네 값 모두 SecretsCheck 가 감시한다. 기본값이 감지되면 예외로 기동을 중단시킨다.
+#
 # 전체 목록은 .env.example 참고.
 
 spring:

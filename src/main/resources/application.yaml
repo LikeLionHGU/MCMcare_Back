@@ -3,10 +3,11 @@ spring:
     name: mcmcare
 
   datasource:
-    # ⚠️ DB_PASSWORD 는 환경변수로 주입한다. yaml 에 실제 비밀번호를 커밋하지 않는다.
+    # 실제 비밀번호는 커밋하지 않는다. 기본값은 로컬 개발용 자리표시자다.
+    # prod 프로필에서 이 기본값이 그대로 쓰이면 SecretsCheck 가 기동을 중단시킨다.
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:mcmcare}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USER:root}
-    password: ${DB_PASSWORD:age0504!}
+    password: ${DB_PASSWORD:local-dev-only-db-password}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:

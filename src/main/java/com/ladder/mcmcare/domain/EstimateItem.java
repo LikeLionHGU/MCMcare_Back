@@ -45,21 +45,27 @@ public class EstimateItem {
     @Column(name = "max_price", nullable = false)
     private int maxPrice;
 
+    /** 비용 근거 수준 — 확인됨 / 부분확인 / 가설. 스텁 견적은 null */
+    @Column(name = "cost_confidence", length = 20)
+    private String costConfidence;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
-    private EstimateItem(Estimate estimate, String repairItemName,
-                         int estimatedPrice, int minPrice, int maxPrice, int sortOrder) {
+    private EstimateItem(Estimate estimate, String repairItemName, int estimatedPrice,
+                         int minPrice, int maxPrice, String costConfidence, int sortOrder) {
         this.estimate = estimate;
         this.repairItemName = repairItemName;
         this.estimatedPrice = estimatedPrice;
         this.minPrice = minPrice;
         this.maxPrice = maxPrice;
+        this.costConfidence = costConfidence;
         this.sortOrder = sortOrder;
     }
 
-    public static EstimateItem of(Estimate estimate, String repairItemName,
-                                  int estimatedPrice, int minPrice, int maxPrice, int sortOrder) {
-        return new EstimateItem(estimate, repairItemName, estimatedPrice, minPrice, maxPrice, sortOrder);
+    public static EstimateItem of(Estimate estimate, String repairItemName, int estimatedPrice,
+                                  int minPrice, int maxPrice, String costConfidence, int sortOrder) {
+        return new EstimateItem(estimate, repairItemName, estimatedPrice,
+                minPrice, maxPrice, costConfidence, sortOrder);
     }
 }

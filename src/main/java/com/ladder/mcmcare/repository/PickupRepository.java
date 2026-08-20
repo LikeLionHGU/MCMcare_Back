@@ -27,6 +27,17 @@ public interface PickupRepository extends JpaRepository<Pickup, Long> {
     @Query("select p from Pickup p where p.pickupNo = :pickupNo")
     Optional<Pickup> findByPickupNoForUpdate(@Param("pickupNo") String pickupNo);
 
+    /**
+     * 자동 인계 스케줄러용 — 픽업 행을 잠근다.
+     *
+     * 스케줄러는 ID 목록을 먼저 뽑고 건별로 처리하는데, 그 사이에 고객이 취소할 수 있다.
+     * 고객 취소(getOwnedForUpdate)와 기사 수동 인계(findByPickupNoForUpdate)는
+     * 같은 행을 잠그므로, 자동 경로만 락이 없으면 취소된 건이 인계될 수 있다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Pickup p where p.id = :pickupId")
+    Optional<Pickup> findByIdForUpdate(@Param("pickupId") Long pickupId);
+
     boolean existsByPickupNo(String pickupNo);
 
     long countByPickupNoStartingWith(String prefix);
