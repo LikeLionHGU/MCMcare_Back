@@ -21,7 +21,15 @@ public class PickupDto {
         private String asNo;
         private String modelName;
         private String statusLabel;
+        /** 접수 대표 사진 1장. 서명된 URL 이다. */
         private String photoUrl;
+
+        /**
+         * 같은 사진을 배열로도 준다.
+         * 견적 화면(EstimateResDto)이 photoUrlList 를 쓰므로 프론트가 같은 코드를 재사용할 수 있다.
+         * 필드명이 달라 화면마다 다르게 읽어야 하면 실수가 생긴다.
+         */
+        private List<String> photoUrlList;
         private String phone;
 
         public static FormResDto of(AsCase c, String photoUrl, String phone) {
@@ -30,6 +38,7 @@ public class PickupDto {
                     .modelName(c.getModelName())
                     .statusLabel(c.getStatus().getLabel())
                     .photoUrl(photoUrl)
+                    .photoUrlList(photoUrl == null ? List.of() : List.of(photoUrl))
                     .phone(phone)
                     .build();
         }

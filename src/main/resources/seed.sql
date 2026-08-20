@@ -105,22 +105,26 @@ CROSS JOIN
 -- ---------------------------------------------------------------------
 -- 시연용 AS 접수 이력
 --
---    목록·상세 화면이 비어 보이지 않도록 미리 넣어 둔다.
---    완료 3건 + 진행 중 2건 구성 — 710 화면의 전체/진행중/완료 탭이 모두 살아난다.
+--    상태 9종을 하나씩 가진 접수 9건. 목록·상세 화면에서 모든 단계를 보여준다.
+--    사진은 uploads/demo/as/demo-1..9.jpg 를 쓴다 (seed-mcm.sh 가 복사).
 --
---    날짜는 실행 시점 기준 상대값으로 만든다.
---    고정값을 박으면 시연 날짜에 따라 "3년 전 접수"처럼 보인다.
+--    초기 상태일수록 최근 접수다 — 실제 흐름과 맞아야 자연스럽다.
+--    날짜는 실행 시점 기준 상대값이라 언제 시연해도 어색하지 않다.
+--
+--    재실행 안전: 아래 9개 번호에 딸린 데이터를 먼저 지우고 다시 넣는다.
 -- ---------------------------------------------------------------------
 SET @mid = (SELECT member_id FROM member WHERE email = 'user@example.com');
 SET @yr  = YEAR(CURDATE());
+-- 사진 URL 의 앞부분. 서버 배포 시에는 FILE_BASE_URL 과 같아야 화면에 이미지가 뜬다.
+--   로컬   http://localhost:8080/files
+--   서버   https://mcm-api.likepigs.shop/files
+--
+-- seed-mcm.sh 가 .env 의 FILE_BASE_URL 로 이 값을 바꿔 실행한다.
+-- 직접 돌릴 때는 아래 값을 환경에 맞게 고친다.
+SET @base = 'http://localhost:8080/files';
+SET @img  = CONCAT(@base, '/demo/as/');
 
 -- ── 재실행 대비 정리 ────────────────────────────────────────
---
--- 시드는 몇 번을 돌려도 같은 결과가 나와야 한다.
--- 한 번 실패하면 중간 상태로 남아 DB 를 통째로 비워야 하는 상황을 막는다.
---
--- 시연 데이터만 지운다. 사용자가 실제로 만든 접수 건은 건드리지 않는다.
--- 대상은 아래 5개 번호로 한정한다.
 CREATE TEMPORARY TABLE IF NOT EXISTS demo_as (as_id BIGINT PRIMARY KEY);
 TRUNCATE demo_as;
 
@@ -131,83 +135,126 @@ WHERE as_no IN (
     CONCAT('AS-', @yr, '-00102') COLLATE utf8mb4_general_ci,
     CONCAT('AS-', @yr, '-00103') COLLATE utf8mb4_general_ci,
     CONCAT('AS-', @yr, '-00104') COLLATE utf8mb4_general_ci,
-    CONCAT('AS-', @yr, '-00105') COLLATE utf8mb4_general_ci
+    CONCAT('AS-', @yr, '-00105') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00106') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00107') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00108') COLLATE utf8mb4_general_ci,
+    CONCAT('AS-', @yr, '-00109') COLLATE utf8mb4_general_ci
 );
 
 -- FK 를 거스르지 않도록 자식부터 지운다
-DELETE FROM estimate_item   WHERE estimate_id IN (SELECT estimate_id FROM estimate WHERE as_id IN (SELECT as_id FROM demo_as));
-DELETE FROM estimate        WHERE as_id IN (SELECT as_id FROM demo_as);
-DELETE FROM handover_photo  WHERE handover_id IN (SELECT handover_id FROM handover WHERE pickup_id IN (SELECT pickup_id FROM pickup WHERE as_id IN (SELECT as_id FROM demo_as)));
-DELETE FROM handover        WHERE pickup_id IN (SELECT pickup_id FROM pickup WHERE as_id IN (SELECT as_id FROM demo_as));
-DELETE FROM pickup          WHERE as_id IN (SELECT as_id FROM demo_as);
-DELETE FROM as_photo        WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM estimate_item     WHERE estimate_id IN (SELECT estimate_id FROM estimate WHERE as_id IN (SELECT as_id FROM demo_as));
+DELETE FROM estimate          WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM handover_photo    WHERE handover_id IN (SELECT handover_id FROM handover WHERE pickup_id IN (SELECT pickup_id FROM pickup WHERE as_id IN (SELECT as_id FROM demo_as)));
+DELETE FROM handover          WHERE pickup_id IN (SELECT pickup_id FROM pickup WHERE as_id IN (SELECT as_id FROM demo_as));
+DELETE FROM pickup            WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM as_photo          WHERE as_id IN (SELECT as_id FROM demo_as);
 DELETE FROM as_status_history WHERE as_id IN (SELECT as_id FROM demo_as);
-DELETE FROM as_case         WHERE as_id IN (SELECT as_id FROM demo_as);
+DELETE FROM as_case           WHERE as_id IN (SELECT as_id FROM demo_as);
 
--- IGNORE 를 쓰지 않는다. FK 위반 등으로 조용히 건너뛰면 시연 데이터가 비어도 알 수 없다.
+
+-- ── 접수 9건 ────────────────────────────────────────────────
+-- IGNORE 를 쓰지 않는다. 조용히 건너뛰면 시연 데이터가 비어도 알 수 없다.
 INSERT INTO as_case
     (as_no, member_id, warranty_no, product_type, model_name, purchased_at, purchase_channel,
      damage_part, damage_type, damage_description, status, status_updated_at, status_message,
      expected_completed_at, completed_at, intake_type, current_location, location_type, location_status,
      created_at, updated_at)
 VALUES
-    -- 완료 3건
-    (CONCAT('AS-', @yr, '-00101'), @mid, 'MCM-W-2022-0301', 'BAG', 'MCM 스타크 백팩 미디엄',
-     '2023-04-15', 'OFFICIAL_STORE', '숄더 스트랩 연결부', 'STITCHING', '스트랩 봉제선이 뜯어졌습니다',
-     'COMPLETED', NOW() - INTERVAL 40 DAY, '수선이 완료되어 고객님께 전달되었습니다',
-     CURDATE() - INTERVAL 40 DAY, CURDATE() - INTERVAL 40 DAY,
-     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
-     NOW() - INTERVAL 62 DAY, NOW() - INTERVAL 40 DAY),
+    -- 1. 접수중 — 견적만 받고 아직 픽업 예약 전
+    (CONCAT('AS-', @yr, '-00101'), @mid, 'MCM-W-2025-1001', 'BAG', 'MCM 스타크 백팩 미디엄',
+     '2025-03-14', 'OFFICIAL_STORE', '상단 커버', 'DENT', '외부 충격으로 눌린 자국이 생겼습니다',
+     'ESTIMATED', NOW() - INTERVAL 2 HOUR, NULL,
+     NULL, NULL, NULL, NULL, NULL, NULL,
+     NOW() - INTERVAL 2 HOUR, NOW() - INTERVAL 2 HOUR),
 
-    (CONCAT('AS-', @yr, '-00102'), @mid, 'MCM-W-2025-1001', 'WALLET', 'MCM 비세토스 장지갑',
-     '2024-01-20', 'DEPARTMENT_STORE', '카드 슬롯', 'SCRATCH', '카드 슬롯 안쪽이 긁혔습니다',
-     'COMPLETED', NOW() - INTERVAL 25 DAY, '수선이 완료되어 고객님께 전달되었습니다',
-     CURDATE() - INTERVAL 25 DAY, CURDATE() - INTERVAL 25 DAY,
-     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
-     NOW() - INTERVAL 45 DAY, NOW() - INTERVAL 25 DAY),
+    -- 2. 접수완료 — 픽업 예약까지 마침
+    (CONCAT('AS-', @yr, '-00102'), @mid, NULL, 'BAG', 'MCM 트래블 캐리어 라지',
+     '2024-08-22', 'ONLINE_STORE', '측면 하단', 'ETC', '모서리가 찢어져 내용물이 보입니다',
+     'PICKUP_BOOKED', NOW() - INTERVAL 20 HOUR, '기사 방문 예정입니다',
+     NULL, NULL, '픽업 수거 접수', NULL, NULL, NULL,
+     NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 20 HOUR),
 
-    (CONCAT('AS-', @yr, '-00103'), @mid, NULL, 'BAG', 'MCM 밀라 미니 크로스백',
-     '2023-11-05', 'ONLINE_STORE', '금속 체인', 'METAL_PART', '체인 도금이 벗겨졌습니다',
-     'COMPLETED', NOW() - INTERVAL 12 DAY, '수선이 완료되어 고객님께 전달되었습니다',
-     CURDATE() - INTERVAL 12 DAY, CURDATE() - INTERVAL 12 DAY,
-     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
-     NOW() - INTERVAL 33 DAY, NOW() - INTERVAL 12 DAY),
+    -- 3. 픽업완료 — 기사 인계 직후
+    (CONCAT('AS-', @yr, '-00103'), @mid, NULL, 'BAG', 'MCM 하드쉘 캐리어 미디엄',
+     '2024-05-10', 'DEPARTMENT_STORE', '측면 패널', 'ETC', '충격으로 외피가 뚫렸습니다',
+     'PICKED_UP', NOW() - INTERVAL 2 DAY, '수선 센터로 이동 중입니다',
+     CURDATE() + INTERVAL 12 DAY, NULL, '픽업 수거 접수', '이동 중', '국내', '수선 센터 이동 중',
+     NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 DAY),
 
-    -- 진행 중 2건
-    (CONCAT('AS-', @yr, '-00104'), @mid, 'MCM-W-2026-0110', 'BAG', 'MCM 클래식 백팩 미디엄',
-     '2024-06-10', 'OFFICIAL_STORE', '지퍼 슬라이더', 'METAL_PART', '지퍼가 중간에 걸립니다',
-     'REPAIRING', NOW() - INTERVAL 2 DAY, '수선 작업을 진행하고 있습니다',
-     CURDATE() + INTERVAL 6 DAY, NULL,
-     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 작업 중',
-     NOW() - INTERVAL 9 DAY, NOW() - INTERVAL 2 DAY),
+    -- 4. 손상부위 진단중 — 센터 입고
+    (CONCAT('AS-', @yr, '-00104'), @mid, 'MCM-W-2022-0301', 'BAG', 'MCM 비세토스 캐리어 스몰',
+     '2022-11-30', 'DUTY_FREE', '전면 패널', 'ETC', '날카로운 물체에 베인 자국이 있습니다',
+     'RECEIVED', NOW() - INTERVAL 4 DAY, '실물 진단을 진행하고 있습니다',
+     CURDATE() + INTERVAL 10 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '실물 진단 중',
+     NOW() - INTERVAL 6 DAY, NOW() - INTERVAL 4 DAY),
 
-    (CONCAT('AS-', @yr, '-00105'), @mid, NULL, 'BAG', 'MCM 로엔 카메라백',
-     '2024-09-01', 'DUTY_FREE', '가죽 표면', 'DISCOLOR', '앞면 가죽이 변색되었습니다',
+    -- 5. 손상부위 진단완료 — 수선 범위 확정
+    (CONCAT('AS-', @yr, '-00105'), @mid, NULL, 'BAG', 'MCM 알루미늄 캐리어 라지',
+     '2023-07-18', 'OFFICIAL_STORE', '상단 모서리', 'ETC', '여러 곳이 파손되어 내용물이 노출됩니다',
+     'DIAGNOSED', NOW() - INTERVAL 5 DAY, '수선 범위가 확정되었습니다',
+     CURDATE() + INTERVAL 9 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 대기',
+     NOW() - INTERVAL 9 DAY, NOW() - INTERVAL 5 DAY),
+
+    -- 6. 수선중
+    (CONCAT('AS-', @yr, '-00106'), @mid, 'MCM-W-2026-0110', 'BAG', 'MCM 소프트쉘 캐리어 미디엄',
+     '2025-01-08', 'ONLINE_STORE', '측면 원단', 'ETC', '원단이 찢어져 구멍이 났습니다',
+     'REPAIRING', NOW() - INTERVAL 3 DAY, '수선 작업을 진행하고 있습니다',
+     CURDATE() + INTERVAL 6 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 작업 중',
+     NOW() - INTERVAL 14 DAY, NOW() - INTERVAL 3 DAY),
+
+    -- 7. 검수중
+    (CONCAT('AS-', @yr, '-00107'), @mid, NULL, 'BAG', 'MCM 클래식 캐리어 라지',
+     '2022-04-02', 'DEPARTMENT_STORE', '본체 전면', 'ETC', '전체적으로 심하게 파손되었습니다',
      'INSPECTING', NOW() - INTERVAL 1 DAY, '품질 검수를 진행하고 있습니다',
-     CURDATE() + INTERVAL 3 DAY, NULL,
-     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '품질 검수 중',
-     NOW() - INTERVAL 15 DAY, NOW() - INTERVAL 1 DAY);
+     CURDATE() + INTERVAL 3 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '품질 검수 중',
+     NOW() - INTERVAL 20 DAY, NOW() - INTERVAL 1 DAY),
 
--- 방금 넣은 5건의 as_id 범위. 문자열 비교를 피한다 —
+    -- 8. 발송중
+    (CONCAT('AS-', @yr, '-00108'), @mid, NULL, 'BAG', 'MCM 다이아몬드 캐리어 미디엄',
+     '2024-02-26', 'OFFICIAL_STORE', '손잡이', 'METAL_PART', '손잡이 고정부가 흔들립니다',
+     'SHIPPING', NOW() - INTERVAL 6 HOUR, '고객님께 배송 중입니다',
+     CURDATE() + INTERVAL 1 DAY, NULL, '픽업 수거 접수', '배송 중', '국내', '고객 배송 중',
+     NOW() - INTERVAL 26 DAY, NOW() - INTERVAL 6 HOUR),
+
+    -- 9. 완료
+    (CONCAT('AS-', @yr, '-00109'), @mid, NULL, 'BAG', 'MCM 파스텔 캐리어 스몰',
+     '2023-09-12', 'ONLINE_STORE', '전면 하단', 'SCRATCH', '표면에 긁힌 자국이 있습니다',
+     'COMPLETED', NOW() - INTERVAL 8 DAY, '수선이 완료되어 고객님께 전달되었습니다',
+     CURDATE() - INTERVAL 8 DAY, CURDATE() - INTERVAL 8 DAY,
+     '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 완료',
+     NOW() - INTERVAL 35 DAY, NOW() - INTERVAL 8 DAY);
+
+-- 방금 넣은 9건의 as_id 범위. 문자열 비교를 피한다 —
 -- CONCAT 결과와 컬럼의 collation 이 다르면 LIKE 가 "Illegal mix of collations" 로 실패한다.
 SET @demo_first = LAST_INSERT_ID();
-SET @demo_last  = @demo_first + 4;
+SET @demo_last  = @demo_first + 8;
 
 
--- 진행 이력 — 타임라인 화면이 단계별로 채워지도록
--- 완료 건은 7단계 전부, 진행 중 건은 현재 단계까지만
+-- ── 손상 사진 ───────────────────────────────────────────────
+-- 접수 순서대로 demo-1..9.jpg 를 붙인다. 목록 썸네일과 상세 화면에 쓰인다.
+INSERT INTO as_photo (as_id, file_url, photo_type, sort_order, created_at)
+SELECT a.as_id,
+       CONCAT(@img, 'demo-', a.as_id - @demo_first + 1, '.jpg'),
+       'DAMAGE', 0, a.created_at
+FROM as_case a
+WHERE a.as_id BETWEEN @demo_first AND @demo_last;
+
+
+-- ── 진행 이력 ───────────────────────────────────────────────
+-- 현재 상태까지의 단계만 남긴다. 아직 오지 않은 단계는 화면이 "예정"으로 채운다.
 INSERT INTO as_status_history (as_id, status, description, occurred_at)
 SELECT a.as_id, s.status, s.description,
-       a.created_at + INTERVAL s.offset_day DAY
+       a.created_at + INTERVAL s.offset_hour HOUR
 FROM as_case a
 CROSS JOIN (
-    SELECT 'PICKED_UP' status, '기사 인계 후 수선 센터로 이동' description, 1 offset_day, 1 ord
-    UNION ALL SELECT 'RECEIVED',   '수선 센터 입고 및 실물 진단 시작', 2,  2
-    UNION ALL SELECT 'DIAGNOSED',  '진단 결과에 따라 수선 범위 확정',   4,  3
-    UNION ALL SELECT 'REPAIRING',  '확정된 범위로 수선 작업 진행',     6,  4
-    UNION ALL SELECT 'INSPECTING', '수선 완료 후 품질 기준 최종 점검',  14, 5
-    UNION ALL SELECT 'SHIPPING',   '검수 완료 후 고객 배송 진행',      18, 6
-    UNION ALL SELECT 'COMPLETED',  '수선 완료',                     20, 7
+    SELECT 'PICKED_UP'  status, '기사 인계 후 수선 센터로 이동' description, 24  offset_hour, 1 ord
+    UNION ALL SELECT 'RECEIVED',   '수선 센터 입고 및 실물 진단 시작', 48,  2
+    UNION ALL SELECT 'DIAGNOSED',  '진단 결과에 따라 수선 범위 확정',   96,  3
+    UNION ALL SELECT 'REPAIRING',  '확정된 범위로 수선 작업 진행',     144, 4
+    UNION ALL SELECT 'INSPECTING', '수선 완료 후 품질 기준 최종 점검',  336, 5
+    UNION ALL SELECT 'SHIPPING',   '검수 완료 후 고객 배송 진행',      432, 6
+    UNION ALL SELECT 'COMPLETED',  '수선 완료',                     480, 7
 ) s
 WHERE a.as_id BETWEEN @demo_first AND @demo_last
   AND s.ord <= CASE a.status
@@ -217,7 +264,8 @@ WHERE a.as_id BETWEEN @demo_first AND @demo_last
         WHEN 'REPAIRING'  THEN 4
         WHEN 'DIAGNOSED'  THEN 3
         WHEN 'RECEIVED'   THEN 2
-        ELSE 1
+        WHEN 'PICKED_UP'  THEN 1
+        ELSE 0
       END;
 
 
@@ -229,4 +277,5 @@ UNION ALL SELECT 'member',      COUNT(*) FROM member
 UNION ALL SELECT 'product',     COUNT(*) FROM product
 UNION ALL SELECT 'pickup_slot', COUNT(*) FROM pickup_slot
 UNION ALL SELECT 'as_case',     COUNT(*) FROM as_case
-UNION ALL SELECT 'as_history',  COUNT(*) FROM as_status_history;
+UNION ALL SELECT 'as_history',  COUNT(*) FROM as_status_history
+UNION ALL SELECT 'as_photo',    COUNT(*) FROM as_photo;
