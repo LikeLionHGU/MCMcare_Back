@@ -1,0 +1,38 @@
+name: deploy
+
+# main 브랜치 푸시에만 동작한다.
+# pull_request 를 넣으면 외부인이 fork 해서 보낸 PR 로도 서버에서 코드가 실행된다.
+# 이 레포는 Public 이므로 반드시 push 로 한정한다.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # GitHub 화면에서 수동 실행도 가능하게
+
+# 배포가 겹치지 않게 한 번에 하나만 돌린다.
+# 연속 푸시가 오면 앞의 것은 취소하고 마지막 것만 배포한다.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: 배포
+        run: ~/deploy-mcm.sh
+
+      - name: 상태 확인
+        run: |
+          sleep 5
+          echo "── 컨테이너 ──"
+          cd ~/projects/MCMcare_Back && docker compose ps
+          echo
+          echo "── 헬스체크 ──"
+          code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 http://localhost:8081/api/health)
+          echo "  /api/health → $code"
+          [ "$code" = "200" ] || { echo "기동 실패"; exit 1; }
+          echo
+          echo "── 견적 구현체 ──"
+          docker compose logs --tail 100 app | grep "견적 산출" || true
