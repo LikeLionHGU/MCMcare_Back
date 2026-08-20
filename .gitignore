@@ -49,3 +49,5 @@ src/main/resources/application-local.*
 
 ### OS ###
 .DS_Store
+# 예시 파일은 팀 공유용이므로 올린다. 어떤 환경변수가 필요한지 알리는 유일한 문서다.
+!.env.example

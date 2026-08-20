@@ -68,7 +68,15 @@ VALUES
      '2024-07-22', 'DUTY_FREE',        24, '2026-07-22', '제조 결함 한정'),
 
     ('MCM-W-2023-0415', 'BAG',    'MCM 비세토스 토트백',
-     '2023-04-15', 'OFFICIAL_STORE',   24, '2025-04-15', '제조 결함 한정');
+     '2023-04-15', 'OFFICIAL_STORE',   24, '2025-04-15', '제조 결함 한정'),
+
+    -- 시연 접수와 짝을 맞춘 캐리어 보증서.
+    -- 보증서를 참조하는 접수 건은 제품 종류·모델명이 일치해야 화면이 어색하지 않다.
+    ('MCM-W-2022-0301C', 'LUGGAGE', 'MCM 비세토스 캐리어 스몰',
+     '2022-11-30', 'DUTY_FREE',        24, '2024-11-30', '제조 결함 한정'),
+
+    ('MCM-W-2026-0110C', 'LUGGAGE', 'MCM 소프트쉘 캐리어 미디엄',
+     '2025-01-08', 'ONLINE_STORE',     24, '2027-01-08', '제조 결함 한정');
 
 
 -- ---------------------------------------------------------------------
@@ -164,56 +172,56 @@ INSERT INTO as_case
      created_at, updated_at)
 VALUES
     -- 2. 접수완료 — 픽업 예약까지 마침
-    (CONCAT('AS-', @yr, '-00102'), @mid, NULL, 'BAG', 'MCM 트래블 캐리어 라지',
+    (CONCAT('AS-', @yr, '-00102'), @mid, NULL, 'LUGGAGE', 'MCM 트래블 캐리어 라지',
      '2024-08-22', 'ONLINE_STORE', '측면 하단', 'ETC', '모서리가 찢어져 내용물이 보입니다',
      'PICKUP_BOOKED', NOW() - INTERVAL 20 HOUR, '기사 방문 예정입니다',
      NULL, NULL, '픽업 수거 접수', NULL, NULL, NULL,
      NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 20 HOUR),
 
     -- 3. 픽업완료 — 기사 인계 직후
-    (CONCAT('AS-', @yr, '-00103'), @mid, NULL, 'BAG', 'MCM 하드쉘 캐리어 미디엄',
+    (CONCAT('AS-', @yr, '-00103'), @mid, NULL, 'LUGGAGE', 'MCM 하드쉘 캐리어 미디엄',
      '2024-05-10', 'DEPARTMENT_STORE', '측면 패널', 'ETC', '충격으로 외피가 뚫렸습니다',
      'PICKED_UP', NOW() - INTERVAL 2 DAY, '수선 센터로 이동 중입니다',
      CURDATE() + INTERVAL 12 DAY, NULL, '픽업 수거 접수', '이동 중', '국내', '수선 센터 이동 중',
      NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 DAY),
 
     -- 4. 손상부위 진단중 — 센터 입고
-    (CONCAT('AS-', @yr, '-00104'), @mid, 'MCM-W-2022-0301', 'BAG', 'MCM 비세토스 캐리어 스몰',
+    (CONCAT('AS-', @yr, '-00104'), @mid, 'MCM-W-2022-0301C', 'LUGGAGE', 'MCM 비세토스 캐리어 스몰',
      '2022-11-30', 'DUTY_FREE', '전면 패널', 'ETC', '날카로운 물체에 베인 자국이 있습니다',
      'RECEIVED', NOW() - INTERVAL 4 DAY, '실물 진단을 진행하고 있습니다',
      CURDATE() + INTERVAL 10 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '실물 진단 중',
      NOW() - INTERVAL 6 DAY, NOW() - INTERVAL 4 DAY),
 
     -- 5. 손상부위 진단완료 — 수선 범위 확정
-    (CONCAT('AS-', @yr, '-00105'), @mid, NULL, 'BAG', 'MCM 알루미늄 캐리어 라지',
+    (CONCAT('AS-', @yr, '-00105'), @mid, NULL, 'LUGGAGE', 'MCM 알루미늄 캐리어 라지',
      '2023-07-18', 'OFFICIAL_STORE', '상단 모서리', 'ETC', '여러 곳이 파손되어 내용물이 노출됩니다',
      'DIAGNOSED', NOW() - INTERVAL 5 DAY, '수선 범위가 확정되었습니다',
      CURDATE() + INTERVAL 9 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 대기',
      NOW() - INTERVAL 9 DAY, NOW() - INTERVAL 5 DAY),
 
     -- 6. 수선중
-    (CONCAT('AS-', @yr, '-00106'), @mid, 'MCM-W-2026-0110', 'BAG', 'MCM 소프트쉘 캐리어 미디엄',
+    (CONCAT('AS-', @yr, '-00106'), @mid, 'MCM-W-2026-0110C', 'LUGGAGE', 'MCM 소프트쉘 캐리어 미디엄',
      '2025-01-08', 'ONLINE_STORE', '측면 원단', 'ETC', '원단이 찢어져 구멍이 났습니다',
      'REPAIRING', NOW() - INTERVAL 3 DAY, '수선 작업을 진행하고 있습니다',
      CURDATE() + INTERVAL 6 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '수선 작업 중',
      NOW() - INTERVAL 14 DAY, NOW() - INTERVAL 3 DAY),
 
     -- 7. 검수중
-    (CONCAT('AS-', @yr, '-00107'), @mid, NULL, 'BAG', 'MCM 클래식 캐리어 라지',
+    (CONCAT('AS-', @yr, '-00107'), @mid, NULL, 'LUGGAGE', 'MCM 클래식 캐리어 라지',
      '2022-04-02', 'DEPARTMENT_STORE', '본체 전면', 'ETC', '전체적으로 심하게 파손되었습니다',
      'INSPECTING', NOW() - INTERVAL 1 DAY, '품질 검수를 진행하고 있습니다',
      CURDATE() + INTERVAL 3 DAY, NULL, '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '품질 검수 중',
      NOW() - INTERVAL 20 DAY, NOW() - INTERVAL 1 DAY),
 
     -- 8. 발송중
-    (CONCAT('AS-', @yr, '-00108'), @mid, NULL, 'BAG', 'MCM 다이아몬드 캐리어 미디엄',
+    (CONCAT('AS-', @yr, '-00108'), @mid, NULL, 'LUGGAGE', 'MCM 다이아몬드 캐리어 미디엄',
      '2024-02-26', 'OFFICIAL_STORE', '손잡이', 'METAL_PART', '손잡이 고정부가 흔들립니다',
      'SHIPPING', NOW() - INTERVAL 6 HOUR, '고객님께 배송 중입니다',
      CURDATE() + INTERVAL 1 DAY, NULL, '픽업 수거 접수', '배송 중', '국내', '고객 배송 중',
      NOW() - INTERVAL 26 DAY, NOW() - INTERVAL 6 HOUR),
 
     -- 9. 완료
-    (CONCAT('AS-', @yr, '-00109'), @mid, NULL, 'BAG', 'MCM 파스텔 캐리어 스몰',
+    (CONCAT('AS-', @yr, '-00109'), @mid, NULL, 'LUGGAGE', 'MCM 파스텔 캐리어 스몰',
      '2023-09-12', 'ONLINE_STORE', '전면 하단', 'SCRATCH', '표면에 긁힌 자국이 있습니다',
      'COMPLETED', NOW() - INTERVAL 8 DAY, '수선이 완료되어 고객님께 전달되었습니다',
      CURDATE() - INTERVAL 8 DAY, CURDATE() - INTERVAL 8 DAY,

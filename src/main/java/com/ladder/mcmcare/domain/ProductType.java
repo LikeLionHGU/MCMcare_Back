@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 public enum ProductType {
 
     BAG("가방"),
+    LUGGAGE("캐리어"),
     WALLET("지갑"),
     BELT("벨트"),
     SHOES("신발"),
