@@ -158,6 +158,11 @@ VALUES
      '픽업 수거 접수', 'MCM 서울 수선 센터', '국내', '품질 검수 중',
      NOW() - INTERVAL 15 DAY, NOW() - INTERVAL 1 DAY);
 
+-- 방금 넣은 5건의 as_id 범위. 문자열 비교를 피한다 —
+-- CONCAT 결과와 컬럼의 collation 이 다르면 LIKE 가 "Illegal mix of collations" 로 실패한다.
+SET @demo_first = LAST_INSERT_ID();
+SET @demo_last  = @demo_first + 4;
+
 
 -- 진행 이력 — 타임라인 화면이 단계별로 채워지도록
 -- 완료 건은 7단계 전부, 진행 중 건은 현재 단계까지만
@@ -174,8 +179,7 @@ CROSS JOIN (
     UNION ALL SELECT 'SHIPPING',   '검수 완료 후 고객 배송 진행',      18, 6
     UNION ALL SELECT 'COMPLETED',  '수선 완료',                     20, 7
 ) s
-WHERE a.member_id = @mid
-  AND a.as_no LIKE CONCAT('AS-', @yr, '-001%')
+WHERE a.as_id BETWEEN @demo_first AND @demo_last
   AND s.ord <= CASE a.status
         WHEN 'COMPLETED'  THEN 7
         WHEN 'SHIPPING'   THEN 6
